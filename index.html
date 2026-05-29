@@ -8,7 +8,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        /* Estilo para a barra de rolagem da tabela */
         .table-scroll::-webkit-scrollbar { height: 8px; }
         .table-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
     </style>
@@ -93,9 +92,10 @@
         // ==========================================
         // 1. CONFIGURAÇÕES SUPABASE
         // ==========================================
-        const supabaseUrl = 'https://gtmcjuwzmzsuifomcodt.supabase.co/rest/v1/';
+        // A URL base não deve conter /rest/v1/ no final para o JS Client funcionar
+        const supabaseUrl = 'https://gtmcjuwzmzsuifomcodt.supabase.co';
         const supabaseKey = 'sb_publishable_eZ-8tGB15B6lgyHjybJtvA_u2WJsts8';
-        const supabase = supabaseCreateClient(supabaseUrl, supabaseKey);
+        const banco = supabase.createClient(supabaseUrl, supabaseKey);
 
         // ==========================================
         // 2. REGRAS DE NEGÓCIO E DADOS FIXOS
@@ -120,7 +120,6 @@
 
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
 
-        // Variável global para armazenar os malotes do mês atual
         let dadosLocais = [];
 
         // ==========================================
@@ -134,7 +133,7 @@
         }
         function salvarConfig() {
             fecharModal();
-            carregarDadosSupabase(); // Recarrega aplicando nova data
+            carregarDadosSupabase(); 
         }
 
         // ==========================================
@@ -156,7 +155,6 @@
             const thead = document.getElementById('matrizHead');
             const tbody = document.getElementById('matrizBody');
             
-            // Construir Cabeçalho (Dias)
             let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-20">Unidade</th>`;
             for (let d = diaInicio; d <= diaFim; d++) {
                 let diaFormatado = d.toString().padStart(2, '0');
@@ -165,7 +163,6 @@
             thHTML += `</tr>`;
             thead.innerHTML = thHTML;
 
-            // Construir Corpo (Unidades x Dias)
             let tbHTML = '';
             unidadesFinais.forEach(unidade => {
                 tbHTML += `<tr class="hover:bg-blue-50 transition">
@@ -181,7 +178,6 @@
             preencherMatrizComDados();
         }
 
-        // Listeners para reconstruir a tabela ao mudar os filtros
         document.getElementById('filtroAno').addEventListener('change', construirMatriz);
         document.getElementById('filtroMes').addEventListener('change', construirMatriz);
         document.getElementById('filtroParte').addEventListener('change', construirMatriz);
@@ -226,7 +222,6 @@
                         return;
                     }
 
-                    // Validação de Feedback Solicitada
                     let unidadeLida = data[0]['Unidade'] || "Desconhecida";
                     let dataMaloteLida = data[0]['DataAtendimento'] || "Desconhecida";
                     alert(`✅ Malote Identificado com Sucesso!\n\nUnidade de Origem: ${unidadeLida}\nData do Malote: ${dataMaloteLida}\nTotal de registros: ${data.length}\n\nEnviando para o sistema...`);
@@ -235,7 +230,7 @@
                     let setAtendimentos = new Set();
                     
                     data.forEach(row => {
-                        if(!row['Unidade'] || !row['Atendimento']) return; // Pula linhas vazias/quebradas
+                        if(!row['Unidade'] || !row['Atendimento']) return; 
                         let unidadeNorm = normalizarUnidade(row['Unidade']);
                         let id = `${unidadeNorm}-${row['Atendimento']}`;
                         
@@ -255,13 +250,12 @@
                         }
                     });
 
-                    // Insere no banco
-                    const { error } = await supabase.from('malotes').upsert(records);
+                    const { error } = await banco.from('malotes').upsert(records);
                     if(!error) {
                         alert('Check-in finalizado e gravado!');
-                        document.getElementById('csvFile').value = ""; // Limpa input
+                        document.getElementById('csvFile').value = ""; 
                     } else {
-                        alert('Erro ao gravar no banco. Verifique suas chaves do Supabase.');
+                        alert('Erro ao gravar no banco. Verifique suas chaves e o Console (F12).');
                         console.error(error);
                     }
                 }
@@ -272,7 +266,6 @@
         // 6. BUSCA DE DADOS E PREENCHIMENTO (REAL-TIME)
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
-            // Suporta YYYY-MM-DD ou DD/MM/YYYY
             if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
             if(dataStr.includes('-')) return parseInt(dataStr.split('-')[2].substring(0,2), 10);
             return null;
@@ -289,17 +282,15 @@
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
                 
-                // Checa se pertence à quinzena atual sendo visualizada
                 if(diaMalote >= diaInicio && diaMalote <= diaFim) {
                     let idCelula = `cel-${linha.unidade.replace(/\s+/g, '')}-${diaMalote}`;
                     let celula = document.getElementById(idCelula);
                     
                     if(celula) {
-                        let corFundo = 'bg-green-400'; // VERDE
+                        let corFundo = 'bg-green-400'; 
                         if(linha.status === 'AMARELO') corFundo = 'bg-yellow-400';
                         if(linha.status === 'VERMELHO') corFundo = 'bg-red-500';
 
-                        // Pinta a célula. Se houver mais de um malote no mesmo dia para a mesma unidade, o último sobrepõe visualmente, ou podemos empilhar
                         celula.innerHTML = `<div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90" title="Malote: ${linha.data_malote}">${diaMalote}</div>`;
                     }
                 }
@@ -307,14 +298,11 @@
         }
 
         async function carregarDadosSupabase() {
-            // Busca apenas os dados do mês/ano filtrado para não sobrecarregar
             const ano = document.getElementById('filtroAno').value;
             const mes = document.getElementById('filtroMes').value;
             
-            // Lógica simplificada: Traz tudo e filtra no JS (Ideal para <10k registros)
-            const { data, error } = await supabase.from('malotes').select('*');
+            const { data, error } = await banco.from('malotes').select('*');
             if(!error && data) {
-                // Filtra dados do mês/ano selecionado com base na string data_malote
                 dadosLocais = data.filter(d => {
                     let isMesCorreto = false;
                     if(d.data_malote.includes('/')) {
@@ -324,14 +312,13 @@
                     }
                     return isMesCorreto;
                 });
-                construirMatriz(); // Reconstrói e preenche
+                construirMatriz(); 
             }
         }
 
-        // Inscrever no canal Real-time
-        supabase.channel('custom-all-channel')
+        banco.channel('custom-all-channel')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
-              carregarDadosSupabase(); // Se alguém mudar algo, atualiza a tela de todos
+              carregarDadosSupabase(); 
           })
           .subscribe();
 
@@ -339,7 +326,6 @@
         document.getElementById('dataConfig').value = new Date().toISOString().split('T')[0];
         construirMatriz();
         carregarDadosSupabase();
-
     </script>
 </body>
 </html>
