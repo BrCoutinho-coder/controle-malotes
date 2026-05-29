@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Malotes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans">
+
+    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center">
+        <h1 class="text-xl font-semibold tracking-wide">Controle de Malotes</h1>
+        <div class="flex items-center gap-4">
+            <input type="date" id="dataConfig" class="text-slate-800 p-1 rounded border-none text-sm" title="Data de Início do Dash">
+            <button class="hover:text-blue-200">⚙️</button>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-6">
+        <div class="flex justify-between items-center bg-white p-4 rounded shadow-sm mb-6 border border-slate-200">
+            <div>
+                <label class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded cursor-pointer transition text-sm font-medium">
+                    ▶ Anexar CSV (Check-in)
+                    <input type="file" id="csvFile" accept=".csv" class="hidden">
+                </label>
+            </div>
+            
+            <div class="flex gap-4 items-center text-sm">
+                <div class="flex gap-2 mr-4">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded-full"></span> Recebido</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 rounded-full"></span> Atraso (Entregue)</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-full"></span> Atrasado</span>
+                </div>
+                
+                <select id="filtroAno" class="border border-slate-300 p-1 rounded text-slate-600"><option>2026</option></select>
+                <select id="filtroMes" class="border border-slate-300 p-1 rounded text-slate-600">
+                    <option value="05">Maio</option>
+                    </select>
+                <select id="filtroParte" class="border border-slate-300 p-1 rounded text-slate-600">
+                    <option value="1">Parte 1 (1 a 15)</option>
+                    <option value="2">Parte 2 (16+)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-white rounded shadow-sm border border-slate-200 overflow-x-auto">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-slate-100 text-slate-600 uppercase text-xs border-b border-slate-200">
+                    <tr>
+                        <th class="px-4 py-3">Unidade</th>
+                        <th class="px-4 py-3">Atendimento (ID)</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Data Entrega</th>
+                    </tr>
+                </thead>
+                <tbody id="tabelaCorpo" class="divide-y divide-slate-100">
+                    </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        // 1. Configuração Supabase (Substitua por suas chaves)
+        const supabaseUrl = 'SUA_URL_AQUI';
+        const supabaseKey = 'SUA_ANON_KEY_AQUI';
+        const supabase = supabaseCreateClient(supabaseUrl, supabaseKey);
+
+        // 2. Dicionário de Unidades (De-Para)
+        const mapaUnidades = {
+            "MOEMA EXPRESS": "MOEMA", "OSASCO EXPANSÃO": "OSASCO", 
+            "TATUAPE (ALA LILÁS)": "TATUAPE", "ROTINAS EXTERNAS": "EXTERNOS",
+            "PROJETO PAPA BRASIL": "EXTERNOS", "SANTO AMARO NTO": "EXTERNOS",
+            "LABORATÓRIO IMD (GRUPO IGESP / TRANSMONTANO)": "EXTERNOS",
+            "OSASCO - NTO": "EXTERNOS", "COLETA EMPRESAS": "COLETA DOMICILIAR"
+        };
+
+        // Feriados estáticos de 2026 (Exemplo: Ano Novo, Carnaval, etc)
+        const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
+
+        function normalizarUnidade(nome) {
+            const n = nome.trim().toUpperCase();
+            return mapaUnidades[n] || n;
+        }
+
+        // Função de Lógica de Negócio: Calcular 5 dias úteis
+        function calcularPrazo(dataInicialStr) {
+            let data = new Date(dataInicialStr);
+            let diasAdicionados = 0;
+            while (diasAdicionados < 5) {
+                data.setDate(data.getDate() + 1);
+                let diaSemana = data.getDay();
+                let dataFormatada = data.toISOString().split('T')[0];
+                
+                // Se não for Sábado (6), não for Domingo (0) e não for feriado
+                if (diaSemana !== 0 && diaSemana !== 6 && !feriados2026.includes(dataFormatada)) {
+                    diasAdicionados++;
+                }
+            }
+            return data;
+        }
+
+        // 3. Processamento do CSV
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const dataConfig = document.getElementById('dataConfig').value || new Date().toISOString().split('T')[0];
+            const dataPrazo = calcularPrazo(dataConfig);
+
+            Papa.parse(file, {
+                header: true,
+                skipEmptyLines: true,
+                complete: async function(results) {
+                    const data = results.data;
+                    let records = [];
+                    let setAtendimentos = new Set(); // Para contagem única
+                    
+                    data.forEach(row => {
+                        let unidadeNorm = normalizarUnidade(row['Unidade']);
+                        let id = `${unidadeNorm}-${row['Atendimento']}`;
+                        
+                        if (!setAtendimentos.has(id)) {
+                            setAtendimentos.add(id);
+                            
+                            let dataCheckin = new Date();
+                            let status = "VERDE"; // Lógica padrão: no prazo
+                            if (dataCheckin > dataPrazo) status = "AMARELO";
+
+                            records.push({
+                                id_unico: id,
+                                unidade: unidadeNorm,
+                                atendimento: row['Atendimento'],
+                                data_malote: row['DataAtendimento'],
+                                status: status
+                            });
+                        }
+                    });
+
+                    // Insere no Supabase (Upsert para não duplicar se derem checkin no mesmo malote 2x)
+                    const { error } = await supabase.from('malotes').upsert(records);
+                    if(!error) alert('Check-in realizado com sucesso!');
+                }
+            });
+        });
+
+        // 4. Real-time: Atualizar tela quando banco mudar
+        function carregarDados() {
+            supabase.from('malotes').select('*').then(({data}) => renderizarTabela(data));
+        }
+
+        supabase.channel('custom-all-channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
+              carregarDados(); // Recarrega se outro usuário fizer check-in
+          })
+          .subscribe();
+
+        function renderizarTabela(dados) {
+            const corpo = document.getElementById('tabelaCorpo');
+            corpo.innerHTML = '';
+            
+            dados.forEach(linha => {
+                let cor = 'bg-green-100 text-green-800';
+                if(linha.status === 'AMARELO') cor = 'bg-yellow-100 text-yellow-800';
+                if(linha.status === 'VERMELHO') cor = 'bg-red-100 text-red-800';
+
+                corpo.innerHTML += `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3 font-medium">${linha.unidade}</td>
+                        <td class="px-4 py-3 text-slate-500">${linha.id_unico}</td>
+                        <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-semibold ${cor}">${linha.status}</span></td>
+                        <td class="px-4 py-3">${new Date(linha.data_checkin).toLocaleDateString('pt-BR')}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // Init
+        carregarDados();
+    </script>
+</body>
+</html>
