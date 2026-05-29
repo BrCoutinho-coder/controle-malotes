@@ -92,7 +92,6 @@
         // ==========================================
         // 1. CONFIGURAÇÕES SUPABASE
         // ==========================================
-        // A URL base não deve conter /rest/v1/ no final para o JS Client funcionar
         const supabaseUrl = 'https://gtmcjuwzmzsuifomcodt.supabase.co';
         const supabaseKey = 'sb_publishable_eZ-8tGB15B6lgyHjybJtvA_u2WJsts8';
         const banco = supabase.createClient(supabaseUrl, supabaseKey);
@@ -101,47 +100,37 @@
         // 2. REGRAS DE NEGÓCIO E DADOS FIXOS
         // ==========================================
         const mapaUnidades = {
-            "MOEMA EXPRESS": "MOEMA", 
-            "OSASCO EXPANSÃO": "OSASCO", 
-            "TATUAPE (ALA LILÁS)": "TATUAPE", 
-            "ROTINAS EXTERNAS": "EXTERNOS",
-            "PROJETO PAPA BRASIL": "EXTERNOS", 
-            "SANTO AMARO NTO": "EXTERNOS",
-            "LABORATÓRIO IMD (GRUPO IGESP / TRANSMONTANO)": "EXTERNOS",
-            "OSASCO - NTO": "EXTERNOS", 
+            "MOEMA EXPRESS": "MOEMA", "OSASCO EXPANSÃO": "OSASCO", "TATUAPE (ALA LILÁS)": "TATUAPE", 
+            "ROTINAS EXTERNAS": "EXTERNOS", "PROJETO PAPA BRASIL": "EXTERNOS", "SANTO AMARO NTO": "EXTERNOS",
+            "LABORATÓRIO IMD (GRUPO IGESP / TRANSMONTANO)": "EXTERNOS", "OSASCO - NTO": "EXTERNOS", 
             "COLETA EMPRESAS": "COLETA DOMICILIAR"
         };
 
         const unidadesFinais = [
-            "PARAISO", "PARAISO PREFERENCE", "PARAISO EXPRESS", "MOEMA", 
-            "OSASCO", "PERDIZES", "SANTANA", "SANTO AMARO", "MORUMBI", 
-            "TATUAPE", "PAULISTA", "VILA OLIMPIA", "EXTERNOS", "COLETA DOMICILIAR"
+            "PARAISO", "PARAISO PREFERENCE", "PARAISO EXPRESS", "MOEMA", "OSASCO", "PERDIZES", 
+            "SANTANA", "SANTO AMARO", "MORUMBI", "TATUAPE", "PAULISTA", "VILA OLIMPIA", "EXTERNOS", "COLETA DOMICILIAR"
         ];
 
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
-
         let dadosLocais = [];
 
         // ==========================================
-        // 3. CONTROLE DO MODAL
+        // 3. CONTROLE DO MODAL E MEMÓRIA
         // ==========================================
-        function abrirModal() {
-            document.getElementById('configModal').classList.remove('hidden');
-        }
-        function fecharModal() {
-            document.getElementById('configModal').classList.add('hidden');
-        }
+        function abrirModal() { document.getElementById('configModal').classList.remove('hidden'); }
+        function fecharModal() { document.getElementById('configModal').classList.add('hidden'); }
+        
         function salvarConfig() {
+            const novaData = document.getElementById('dataConfig').value;
+            localStorage.setItem('dataMalotesConfig', novaData); // Salva para sempre no navegador
             fecharModal();
-            carregarDadosSupabase(); 
+            construirMatriz(); // Recalcula toda a matriz dinamicamente
         }
 
         // ==========================================
         // 4. LÓGICA DE DATAS E RENDERIZAÇÃO DA MATRIZ
         // ==========================================
-        function obterDiasDoMes(ano, mes) {
-            return new Date(ano, mes, 0).getDate();
-        }
+        function obterDiasDoMes(ano, mes) { return new Date(ano, mes, 0).getDate(); }
 
         function construirMatriz() {
             const ano = document.getElementById('filtroAno').value;
@@ -157,19 +146,16 @@
             
             let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-20">Unidade</th>`;
             for (let d = diaInicio; d <= diaFim; d++) {
-                let diaFormatado = d.toString().padStart(2, '0');
-                thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${diaFormatado}</th>`;
+                thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${d.toString().padStart(2, '0')}</th>`;
             }
             thHTML += `</tr>`;
             thead.innerHTML = thHTML;
 
             let tbHTML = '';
             unidadesFinais.forEach(unidade => {
-                tbHTML += `<tr class="hover:bg-blue-50 transition">
-                            <td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">${unidade}</td>`;
+                tbHTML += `<tr class="hover:bg-blue-50 transition"><td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">${unidade}</td>`;
                 for (let d = diaInicio; d <= diaFim; d++) {
-                    let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
-                    tbHTML += `<td id="${idCelula}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
+                    tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
                 }
                 tbHTML += `</tr>`;
             });
@@ -191,7 +177,6 @@
         }
 
         function calcularPrazo(dataInicialStr) {
-            if(!dataInicialStr) return new Date();
             let data = new Date(dataInicialStr);
             let diasAdicionados = 0;
             while (diasAdicionados < 5) {
@@ -209,22 +194,17 @@
             const file = e.target.files[0];
             if(!file) return;
 
-            const dataConfig = document.getElementById('dataConfig').value || new Date().toISOString().split('T')[0];
-            const dataPrazo = calcularPrazo(dataConfig);
-
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
+                delimiter: ";", // CORREÇÃO CRÍTICA PARA O SEU CSV
                 complete: async function(results) {
                     const data = results.data;
-                    if(data.length === 0) {
-                        alert("O CSV está vazio ou o formato é inválido.");
-                        return;
-                    }
+                    if(data.length === 0) { alert("O CSV está vazio ou o formato é inválido."); return; }
 
                     let unidadeLida = data[0]['Unidade'] || "Desconhecida";
                     let dataMaloteLida = data[0]['DataAtendimento'] || "Desconhecida";
-                    alert(`✅ Malote Identificado com Sucesso!\n\nUnidade de Origem: ${unidadeLida}\nData do Malote: ${dataMaloteLida}\nTotal de registros: ${data.length}\n\nEnviando para o sistema...`);
+                    alert(`✅ Malote Identificado!\nUnidade: ${unidadeLida}\nData do Malote: ${dataMaloteLida}\nRegistros lidos: ${data.length}\n\nEnviando...`);
 
                     let records = [];
                     let setAtendimentos = new Set();
@@ -236,34 +216,30 @@
                         
                         if (!setAtendimentos.has(id)) {
                             setAtendimentos.add(id);
-                            let dataCheckin = new Date();
-                            let status = "VERDE";
-                            if (dataCheckin > dataPrazo) status = "AMARELO";
-
+                            // O status não é mais travado aqui, apenas a data de checkin real
                             records.push({
                                 id_unico: id,
                                 unidade: unidadeNorm,
                                 atendimento: row['Atendimento'],
                                 data_malote: row['DataAtendimento'],
-                                status: status
+                                status: "RECEBIDO" 
                             });
                         }
                     });
 
                     const { error } = await banco.from('malotes').upsert(records);
                     if(!error) {
-                        alert('Check-in finalizado e gravado!');
+                        alert('Check-in finalizado!');
                         document.getElementById('csvFile').value = ""; 
                     } else {
-                        alert('Erro ao gravar no banco. Verifique suas chaves e o Console (F12).');
-                        console.error(error);
+                        alert('Erro ao gravar no banco. Verifique o F12.');
                     }
                 }
             });
         });
 
         // ==========================================
-        // 6. BUSCA DE DADOS E PREENCHIMENTO (REAL-TIME)
+        // 6. BUSCA DE DADOS E CÁLCULO DINÂMICO
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
             if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
@@ -272,12 +248,14 @@
         }
 
         function preencherMatrizComDados() {
-            const ano = document.getElementById('filtroAno').value;
-            const mes = document.getElementById('filtroMes').value;
             const parte = document.getElementById('filtroParte').value;
-            
             const diaInicio = parte === "1" ? 1 : 16;
             const diaFim = parte === "1" ? 15 : 31;
+
+            // Recalcula o prazo MESTRE com base na engrenagem sempre que a tela desenha
+            const dataConfig = document.getElementById('dataConfig').value;
+            const dataPrazo = calcularPrazo(dataConfig);
+            dataPrazo.setHours(23, 59, 59, 999);
 
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
@@ -287,11 +265,19 @@
                     let celula = document.getElementById(idCelula);
                     
                     if(celula) {
-                        let corFundo = 'bg-green-400'; 
-                        if(linha.status === 'AMARELO') corFundo = 'bg-yellow-400';
-                        if(linha.status === 'VERMELHO') corFundo = 'bg-red-500';
+                        // Faz a conta dinâmica do status usando a data do banco vs data Mestre
+                        let dataCheckin = new Date(linha.data_checkin);
+                        let corFundo = 'bg-green-500'; // No prazo
+                        
+                        if(dataCheckin > dataPrazo) {
+                            corFundo = 'bg-yellow-400'; // Entregou atrasado
+                        }
 
-                        celula.innerHTML = `<div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90" title="Malote: ${linha.data_malote}">${diaMalote}</div>`;
+                        // Formata a data de entrega para aparecer dentro do quadrado (Ex: 29/05)
+                        let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
+                        let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
+
+                        celula.innerHTML = `<div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90" title="Entregue em: ${diaEntrega}/${mesEntrega}">${diaEntrega}/${mesEntrega}</div>`;
                     }
                 }
             });
@@ -304,13 +290,9 @@
             const { data, error } = await banco.from('malotes').select('*');
             if(!error && data) {
                 dadosLocais = data.filter(d => {
-                    let isMesCorreto = false;
-                    if(d.data_malote.includes('/')) {
-                        isMesCorreto = d.data_malote.includes(`/${mes}/${ano}`);
-                    } else if (d.data_malote.includes('-')) {
-                        isMesCorreto = d.data_malote.startsWith(`${ano}-${mes}`);
-                    }
-                    return isMesCorreto;
+                    if(d.data_malote.includes('/')) return d.data_malote.includes(`/${mes}/${ano}`);
+                    if (d.data_malote.includes('-')) return d.data_malote.startsWith(`${ano}-${mes}`);
+                    return false;
                 });
                 construirMatriz(); 
             }
@@ -322,8 +304,10 @@
           })
           .subscribe();
 
-        // Init Inicial
-        document.getElementById('dataConfig').value = new Date().toISOString().split('T')[0];
+        // Init Inicial com Memória (LocalStorage)
+        const dataSalva = localStorage.getItem('dataMalotesConfig');
+        document.getElementById('dataConfig').value = dataSalva ? dataSalva : new Date().toISOString().split('T')[0];
+        
         construirMatriz();
         carregarDadosSupabase();
     </script>
