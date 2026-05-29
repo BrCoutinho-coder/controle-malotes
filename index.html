@@ -3,97 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard de Malotes</title>
+    <title>Controle de Malotes</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Estilo para a barra de rolagem da tabela */
+        .table-scroll::-webkit-scrollbar { height: 8px; }
+        .table-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans">
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col">
 
-    <header class="bg-blue-800 text-white p-4 shadow-md flex justify-between items-center">
-        <h1 class="text-xl font-semibold tracking-wide">Controle de Malotes</h1>
-        <div class="flex items-center gap-4">
-            <input type="date" id="dataConfig" class="text-slate-800 p-1 rounded border-none text-sm" title="Data de Início do Dash">
-            <button class="hover:text-blue-200">⚙️</button>
-        </div>
+    <header class="bg-[#1e3a8a] text-white p-4 shadow-md flex justify-between items-center shrink-0">
+        <h1 class="text-xl font-bold tracking-wide">Controle de Malotes</h1>
+        <button onclick="abrirModal()" class="hover:text-blue-200 text-2xl" title="Configurações">⚙️</button>
     </header>
 
-    <main class="max-w-7xl mx-auto p-6">
-        <div class="flex justify-between items-center bg-white p-4 rounded shadow-sm mb-6 border border-slate-200">
-            <div>
-                <label class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded cursor-pointer transition text-sm font-medium">
-                    ▶ Anexar CSV (Check-in)
-                    <input type="file" id="csvFile" accept=".csv" class="hidden">
-                </label>
+    <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-96">
+            <h2 class="text-lg font-bold text-slate-800 mb-4">Configurações do Sistema</h2>
+            <label class="block text-sm font-medium text-slate-600 mb-1">Data de Início do Dashboard:</label>
+            <input type="date" id="dataConfig" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700">
+            <div class="flex justify-end gap-2">
+                <button onclick="fecharModal()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">Cancelar</button>
+                <button onclick="salvarConfig()" class="px-4 py-2 bg-[#1e3a8a] text-white rounded hover:bg-blue-700">Salvar</button>
             </div>
+        </div>
+    </div>
+
+    <main class="flex-1 overflow-hidden p-6 flex flex-col max-w-[1400px] mx-auto w-full">
+        <div class="flex flex-wrap gap-4 justify-between items-center bg-white p-4 rounded shadow-sm border border-slate-200 shrink-0">
             
-            <div class="flex gap-4 items-center text-sm">
-                <div class="flex gap-2 mr-4">
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded-full"></span> Recebido</span>
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 rounded-full"></span> Atraso (Entregue)</span>
-                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-full"></span> Atrasado</span>
+            <label class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded shadow cursor-pointer transition text-sm font-bold flex items-center gap-2">
+                ▶ Anexar CSV (Check-in)
+                <input type="file" id="csvFile" accept=".csv" class="hidden">
+            </label>
+            
+            <div class="flex flex-wrap gap-4 items-center text-sm font-medium">
+                <div class="flex gap-3 mr-2 bg-slate-50 p-2 rounded border border-slate-100">
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-green-500 rounded-sm"></span> Recebido</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-yellow-400 rounded-sm"></span> Atraso (Entregue)</span>
+                    <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-sm"></span> Atrasado</span>
                 </div>
                 
-                <select id="filtroAno" class="border border-slate-300 p-1 rounded text-slate-600"><option>2026</option></select>
-                <select id="filtroMes" class="border border-slate-300 p-1 rounded text-slate-600">
-                    <option value="05">Maio</option>
-                    </select>
-                <select id="filtroParte" class="border border-slate-300 p-1 rounded text-slate-600">
-                    <option value="1">Parte 1 (1 a 15)</option>
-                    <option value="2">Parte 2 (16+)</option>
+                <select id="filtroAno" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026" selected>2026</option>
+                    <option value="2027">2027</option>
+                    <option value="2028">2028</option>
+                </select>
+
+                <select id="filtroMes" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
+                    <option value="01">Janeiro</option>
+                    <option value="02">Fevereiro</option>
+                    <option value="03">Março</option>
+                    <option value="04">Abril</option>
+                    <option value="05" selected>Maio</option>
+                    <option value="06">Junho</option>
+                    <option value="07">Julho</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Setembro</option>
+                    <option value="10">Outubro</option>
+                    <option value="11">Novembro</option>
+                    <option value="12">Dezembro</option>
+                </select>
+
+                <select id="filtroParte" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
+                    <option value="1">Parte 1 (Dias 1 a 15)</option>
+                    <option value="2">Parte 2 (Dias 16 ao fim)</option>
                 </select>
             </div>
         </div>
 
-        <div class="bg-white rounded shadow-sm border border-slate-200 overflow-x-auto">
-            <table class="w-full text-sm text-left">
-                <thead class="bg-slate-100 text-slate-600 uppercase text-xs border-b border-slate-200">
-                    <tr>
-                        <th class="px-4 py-3">Unidade</th>
-                        <th class="px-4 py-3">Atendimento (ID)</th>
-                        <th class="px-4 py-3">Status</th>
-                        <th class="px-4 py-3">Data Entrega</th>
-                    </tr>
-                </thead>
-                <tbody id="tabelaCorpo" class="divide-y divide-slate-100">
-                    </tbody>
-            </table>
+        <div class="mt-4 bg-white rounded shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
+            <div class="overflow-x-auto table-scroll flex-1 relative">
+                <table class="w-full text-sm text-center border-collapse">
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0 z-10 shadow-sm" id="matrizHead">
+                        </thead>
+                    <tbody class="divide-y divide-slate-200" id="matrizBody">
+                        </tbody>
+                </table>
+            </div>
         </div>
     </main>
 
     <script>
-        // 1. Configuração Supabase (Substitua por suas chaves)
+        // ==========================================
+        // 1. CONFIGURAÇÕES SUPABASE
+        // ==========================================
         const supabaseUrl = 'https://gtmcjuwzmzsuifomcodt.supabase.co/rest/v1/';
         const supabaseKey = 'sb_publishable_eZ-8tGB15B6lgyHjybJtvA_u2WJsts8';
         const supabase = supabaseCreateClient(supabaseUrl, supabaseKey);
 
-        // 2. Dicionário de Unidades (De-Para)
+        // ==========================================
+        // 2. REGRAS DE NEGÓCIO E DADOS FIXOS
+        // ==========================================
         const mapaUnidades = {
-            "MOEMA EXPRESS": "MOEMA", "OSASCO EXPANSÃO": "OSASCO", 
-            "TATUAPE (ALA LILÁS)": "TATUAPE", "ROTINAS EXTERNAS": "EXTERNOS",
-            "PROJETO PAPA BRASIL": "EXTERNOS", "SANTO AMARO NTO": "EXTERNOS",
+            "MOEMA EXPRESS": "MOEMA", 
+            "OSASCO EXPANSÃO": "OSASCO", 
+            "TATUAPE (ALA LILÁS)": "TATUAPE", 
+            "ROTINAS EXTERNAS": "EXTERNOS",
+            "PROJETO PAPA BRASIL": "EXTERNOS", 
+            "SANTO AMARO NTO": "EXTERNOS",
             "LABORATÓRIO IMD (GRUPO IGESP / TRANSMONTANO)": "EXTERNOS",
-            "OSASCO - NTO": "EXTERNOS", "COLETA EMPRESAS": "COLETA DOMICILIAR"
+            "OSASCO - NTO": "EXTERNOS", 
+            "COLETA EMPRESAS": "COLETA DOMICILIAR"
         };
 
-        // Feriados estáticos de 2026 (Exemplo: Ano Novo, Carnaval, etc)
+        const unidadesFinais = [
+            "PARAISO", "PARAISO PREFERENCE", "PARAISO EXPRESS", "MOEMA", 
+            "OSASCO", "PERDIZES", "SANTANA", "SANTO AMARO", "MORUMBI", 
+            "TATUAPE", "PAULISTA", "VILA OLIMPIA", "EXTERNOS", "COLETA DOMICILIAR"
+        ];
+
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
 
+        // Variável global para armazenar os malotes do mês atual
+        let dadosLocais = [];
+
+        // ==========================================
+        // 3. CONTROLE DO MODAL
+        // ==========================================
+        function abrirModal() {
+            document.getElementById('configModal').classList.remove('hidden');
+        }
+        function fecharModal() {
+            document.getElementById('configModal').classList.add('hidden');
+        }
+        function salvarConfig() {
+            fecharModal();
+            carregarDadosSupabase(); // Recarrega aplicando nova data
+        }
+
+        // ==========================================
+        // 4. LÓGICA DE DATAS E RENDERIZAÇÃO DA MATRIZ
+        // ==========================================
+        function obterDiasDoMes(ano, mes) {
+            return new Date(ano, mes, 0).getDate();
+        }
+
+        function construirMatriz() {
+            const ano = document.getElementById('filtroAno').value;
+            const mes = document.getElementById('filtroMes').value;
+            const parte = document.getElementById('filtroParte').value;
+            
+            const totalDias = obterDiasDoMes(ano, mes);
+            const diaInicio = parte === "1" ? 1 : 16;
+            const diaFim = parte === "1" ? 15 : totalDias;
+
+            const thead = document.getElementById('matrizHead');
+            const tbody = document.getElementById('matrizBody');
+            
+            // Construir Cabeçalho (Dias)
+            let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-20">Unidade</th>`;
+            for (let d = diaInicio; d <= diaFim; d++) {
+                let diaFormatado = d.toString().padStart(2, '0');
+                thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${diaFormatado}</th>`;
+            }
+            thHTML += `</tr>`;
+            thead.innerHTML = thHTML;
+
+            // Construir Corpo (Unidades x Dias)
+            let tbHTML = '';
+            unidadesFinais.forEach(unidade => {
+                tbHTML += `<tr class="hover:bg-blue-50 transition">
+                            <td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">${unidade}</td>`;
+                for (let d = diaInicio; d <= diaFim; d++) {
+                    let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
+                    tbHTML += `<td id="${idCelula}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
+                }
+                tbHTML += `</tr>`;
+            });
+            tbody.innerHTML = tbHTML;
+
+            preencherMatrizComDados();
+        }
+
+        // Listeners para reconstruir a tabela ao mudar os filtros
+        document.getElementById('filtroAno').addEventListener('change', construirMatriz);
+        document.getElementById('filtroMes').addEventListener('change', construirMatriz);
+        document.getElementById('filtroParte').addEventListener('change', construirMatriz);
+
+        // ==========================================
+        // 5. PROCESSAMENTO E CHECK-IN DE CSV
+        // ==========================================
         function normalizarUnidade(nome) {
             const n = nome.trim().toUpperCase();
             return mapaUnidades[n] || n;
         }
 
-        // Função de Lógica de Negócio: Calcular 5 dias úteis
         function calcularPrazo(dataInicialStr) {
+            if(!dataInicialStr) return new Date();
             let data = new Date(dataInicialStr);
             let diasAdicionados = 0;
             while (diasAdicionados < 5) {
                 data.setDate(data.getDate() + 1);
                 let diaSemana = data.getDay();
                 let dataFormatada = data.toISOString().split('T')[0];
-                
-                // Se não for Sábado (6), não for Domingo (0) e não for feriado
                 if (diaSemana !== 0 && diaSemana !== 6 && !feriados2026.includes(dataFormatada)) {
                     diasAdicionados++;
                 }
@@ -101,9 +209,10 @@
             return data;
         }
 
-        // 3. Processamento do CSV
         document.getElementById('csvFile').addEventListener('change', function(e) {
             const file = e.target.files[0];
+            if(!file) return;
+
             const dataConfig = document.getElementById('dataConfig').value || new Date().toISOString().split('T')[0];
             const dataPrazo = calcularPrazo(dataConfig);
 
@@ -112,18 +221,28 @@
                 skipEmptyLines: true,
                 complete: async function(results) {
                     const data = results.data;
+                    if(data.length === 0) {
+                        alert("O CSV está vazio ou o formato é inválido.");
+                        return;
+                    }
+
+                    // Validação de Feedback Solicitada
+                    let unidadeLida = data[0]['Unidade'] || "Desconhecida";
+                    let dataMaloteLida = data[0]['DataAtendimento'] || "Desconhecida";
+                    alert(`✅ Malote Identificado com Sucesso!\n\nUnidade de Origem: ${unidadeLida}\nData do Malote: ${dataMaloteLida}\nTotal de registros: ${data.length}\n\nEnviando para o sistema...`);
+
                     let records = [];
-                    let setAtendimentos = new Set(); // Para contagem única
+                    let setAtendimentos = new Set();
                     
                     data.forEach(row => {
+                        if(!row['Unidade'] || !row['Atendimento']) return; // Pula linhas vazias/quebradas
                         let unidadeNorm = normalizarUnidade(row['Unidade']);
                         let id = `${unidadeNorm}-${row['Atendimento']}`;
                         
                         if (!setAtendimentos.has(id)) {
                             setAtendimentos.add(id);
-                            
                             let dataCheckin = new Date();
-                            let status = "VERDE"; // Lógica padrão: no prazo
+                            let status = "VERDE";
                             if (dataCheckin > dataPrazo) status = "AMARELO";
 
                             records.push({
@@ -136,46 +255,91 @@
                         }
                     });
 
-                    // Insere no Supabase (Upsert para não duplicar se derem checkin no mesmo malote 2x)
+                    // Insere no banco
                     const { error } = await supabase.from('malotes').upsert(records);
-                    if(!error) alert('Check-in realizado com sucesso!');
+                    if(!error) {
+                        alert('Check-in finalizado e gravado!');
+                        document.getElementById('csvFile').value = ""; // Limpa input
+                    } else {
+                        alert('Erro ao gravar no banco. Verifique suas chaves do Supabase.');
+                        console.error(error);
+                    }
                 }
             });
         });
 
-        // 4. Real-time: Atualizar tela quando banco mudar
-        function carregarDados() {
-            supabase.from('malotes').select('*').then(({data}) => renderizarTabela(data));
+        // ==========================================
+        // 6. BUSCA DE DADOS E PREENCHIMENTO (REAL-TIME)
+        // ==========================================
+        function extrairDiaDaStringData(dataStr) {
+            // Suporta YYYY-MM-DD ou DD/MM/YYYY
+            if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
+            if(dataStr.includes('-')) return parseInt(dataStr.split('-')[2].substring(0,2), 10);
+            return null;
         }
 
-        supabase.channel('custom-all-channel')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
-              carregarDados(); // Recarrega se outro usuário fizer check-in
-          })
-          .subscribe();
-
-        function renderizarTabela(dados) {
-            const corpo = document.getElementById('tabelaCorpo');
-            corpo.innerHTML = '';
+        function preencherMatrizComDados() {
+            const ano = document.getElementById('filtroAno').value;
+            const mes = document.getElementById('filtroMes').value;
+            const parte = document.getElementById('filtroParte').value;
             
-            dados.forEach(linha => {
-                let cor = 'bg-green-100 text-green-800';
-                if(linha.status === 'AMARELO') cor = 'bg-yellow-100 text-yellow-800';
-                if(linha.status === 'VERMELHO') cor = 'bg-red-100 text-red-800';
+            const diaInicio = parte === "1" ? 1 : 16;
+            const diaFim = parte === "1" ? 15 : 31;
 
-                corpo.innerHTML += `
-                    <tr class="hover:bg-slate-50 transition">
-                        <td class="px-4 py-3 font-medium">${linha.unidade}</td>
-                        <td class="px-4 py-3 text-slate-500">${linha.id_unico}</td>
-                        <td class="px-4 py-3"><span class="px-2 py-1 rounded text-xs font-semibold ${cor}">${linha.status}</span></td>
-                        <td class="px-4 py-3">${new Date(linha.data_checkin).toLocaleDateString('pt-BR')}</td>
-                    </tr>
-                `;
+            dadosLocais.forEach(linha => {
+                let diaMalote = extrairDiaDaStringData(linha.data_malote);
+                
+                // Checa se pertence à quinzena atual sendo visualizada
+                if(diaMalote >= diaInicio && diaMalote <= diaFim) {
+                    let idCelula = `cel-${linha.unidade.replace(/\s+/g, '')}-${diaMalote}`;
+                    let celula = document.getElementById(idCelula);
+                    
+                    if(celula) {
+                        let corFundo = 'bg-green-400'; // VERDE
+                        if(linha.status === 'AMARELO') corFundo = 'bg-yellow-400';
+                        if(linha.status === 'VERMELHO') corFundo = 'bg-red-500';
+
+                        // Pinta a célula. Se houver mais de um malote no mesmo dia para a mesma unidade, o último sobrepõe visualmente, ou podemos empilhar
+                        celula.innerHTML = `<div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90" title="Malote: ${linha.data_malote}">${diaMalote}</div>`;
+                    }
+                }
             });
         }
 
-        // Init
-        carregarDados();
+        async function carregarDadosSupabase() {
+            // Busca apenas os dados do mês/ano filtrado para não sobrecarregar
+            const ano = document.getElementById('filtroAno').value;
+            const mes = document.getElementById('filtroMes').value;
+            
+            // Lógica simplificada: Traz tudo e filtra no JS (Ideal para <10k registros)
+            const { data, error } = await supabase.from('malotes').select('*');
+            if(!error && data) {
+                // Filtra dados do mês/ano selecionado com base na string data_malote
+                dadosLocais = data.filter(d => {
+                    let isMesCorreto = false;
+                    if(d.data_malote.includes('/')) {
+                        isMesCorreto = d.data_malote.includes(`/${mes}/${ano}`);
+                    } else if (d.data_malote.includes('-')) {
+                        isMesCorreto = d.data_malote.startsWith(`${ano}-${mes}`);
+                    }
+                    return isMesCorreto;
+                });
+                construirMatriz(); // Reconstrói e preenche
+            }
+        }
+
+        // Inscrever no canal Real-time
+        supabase.channel('custom-all-channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
+              carregarDadosSupabase(); // Se alguém mudar algo, atualiza a tela de todos
+          })
+          .subscribe();
+
+        // Init Inicial
+        document.getElementById('dataConfig').value = new Date().toISOString().split('T')[0];
+        construirMatriz();
+        carregarDadosSupabase();
+
     </script>
 </body>
 </html>
