@@ -114,17 +114,35 @@
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
         let dadosLocais = [];
 
+       // ==========================================
+        // 3. CONTROLE DO MODAL E CONFIGURAÇÃO GLOBAL (SUPABASE)
         // ==========================================
-        // 3. CONTROLE DO MODAL E MEMÓRIA
-        // ==========================================
+        let dataMestreGlobal = new Date().toISOString().split('T')[0];
+
         function abrirModal() { document.getElementById('configModal').classList.remove('hidden'); }
         function fecharModal() { document.getElementById('configModal').classList.add('hidden'); }
         
-        function salvarConfig() {
+        async function salvarConfig() {
             const novaData = document.getElementById('dataConfig').value;
-            localStorage.setItem('dataMalotesConfig', novaData); // Salva para sempre no navegador
             fecharModal();
-            construirMatriz(); // Recalcula toda a matriz dinamicamente
+            
+            // Atualiza a data para TODOS os usuários no banco
+            const { error } = await banco.from('configuracoes')
+                                         .update({ data_mestre: novaData })
+                                         .eq('id', 1);
+            if (error) {
+                alert("Erro ao salvar configuração global.");
+                console.error(error);
+            }
+        }
+
+        async function carregarConfiguracaoGlobal() {
+            const { data, error } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
+            if (!error && data) {
+                dataMestreGlobal = data.data_mestre;
+                document.getElementById('dataConfig').value = dataMestreGlobal;
+                construirMatriz(); // Recalcula a tela sempre que a data global mudar
+            }
         }
 
         // ==========================================
@@ -238,8 +256,8 @@
             });
         });
 
-        // ==========================================
-        // 6. BUSCA DE DADOS E CÁLCULO DINÂMICO
+       // ==========================================
+        // 6. BUSCA DE DADOS, CÁLCULO DINÂMICO E REAL-TIME
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
             if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
@@ -252,9 +270,8 @@
             const diaInicio = parte === "1" ? 1 : 16;
             const diaFim = parte === "1" ? 15 : 31;
 
-            // Recalcula o prazo MESTRE com base na engrenagem sempre que a tela desenha
-            const dataConfig = document.getElementById('dataConfig').value;
-            const dataPrazo = calcularPrazo(dataConfig);
+            // Usa a Data Mestre Global que foi carregada do banco
+            const dataPrazo = calcularPrazo(dataMestreGlobal);
             dataPrazo.setHours(23, 59, 59, 999);
 
             dadosLocais.forEach(linha => {
@@ -265,15 +282,10 @@
                     let celula = document.getElementById(idCelula);
                     
                     if(celula) {
-                        // Faz a conta dinâmica do status usando a data do banco vs data Mestre
                         let dataCheckin = new Date(linha.data_checkin);
-                        let corFundo = 'bg-green-500'; // No prazo
-                        
-                        if(dataCheckin > dataPrazo) {
-                            corFundo = 'bg-yellow-400'; // Entregou atrasado
-                        }
+                        // Lógica: Verde se entregue dentro do prazo, Amarelo se passou do prazo
+                        let corFundo = (dataCheckin <= dataPrazo) ? 'bg-green-500' : 'bg-yellow-400';
 
-                        // Formata a data de entrega para aparecer dentro do quadrado (Ex: 29/05)
                         let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
                         let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
 
@@ -298,18 +310,31 @@
             }
         }
 
-        banco.channel('custom-all-channel')
+        // Real-time: Escuta mudanças na tabela de Malotes
+        banco.channel('canal-malotes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
               carregarDadosSupabase(); 
-          })
-          .subscribe();
+          }).subscribe();
 
-        // Init Inicial com Memória (LocalStorage)
-        const dataSalva = localStorage.getItem('dataMalotesConfig');
-        document.getElementById('dataConfig').value = dataSalva ? dataSalva : new Date().toISOString().split('T')[0];
-        
-        construirMatriz();
-        carregarDadosSupabase();
+        // Real-time: Escuta mudanças na Data Global (Configurações)
+        banco.channel('canal-config')
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracoes' }, payload => {
+              dataMestreGlobal = payload.new.data_mestre;
+              document.getElementById('dataConfig').value = dataMestreGlobal;
+              construirMatriz(); // Recalcula as cores de todos instantaneamente
+          }).subscribe();
+
+        // INIT INICIAL
+        async function iniciarDashboard() {
+            // Primeiro busca a config global no banco
+            const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
+            if(data) dataMestreGlobal = data.data_mestre;
+            
+            document.getElementById('dataConfig').value = dataMestreGlobal;
+            await carregarDadosSupabase();
+        }
+
+        iniciarDashboard();
     </script>
 </body>
 </html>
