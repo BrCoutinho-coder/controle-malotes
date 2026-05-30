@@ -22,7 +22,7 @@
     <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded shadow-lg w-96">
             <h2 class="text-lg font-bold text-slate-800 mb-4">Configurações do Sistema</h2>
-            <label class="block text-sm font-medium text-slate-600 mb-1">Data de Início do Dashboard:</label>
+            <label class="block text-sm font-medium text-slate-600 mb-1">A partir de qual data os prazos contam?</label>
             <input type="date" id="dataConfig" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700">
             <div class="flex justify-end gap-2">
                 <button onclick="fecharModal()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">Cancelar</button>
@@ -31,13 +31,30 @@
         </div>
     </div>
 
+    <div id="checkinModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-lg w-96">
+            <h2 class="text-lg font-bold text-slate-800 mb-4">Check-in de Malote</h2>
+            
+            <label class="block text-sm font-medium text-slate-600 mb-1">Data REAL do Recebimento:</label>
+            <p class="text-xs text-slate-500 mb-3">Se o malote chegou ontem de tarde e você está lançando hoje, coloque a data de ontem.</p>
+            <input type="date" id="dataRecebimento" class="w-full border border-slate-300 p-2 rounded mb-4 text-slate-700">
+            
+            <label class="block text-sm font-medium text-slate-600 mb-1">Arquivo CSV:</label>
+            <input type="file" id="csvFileInput" accept=".csv" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700 bg-slate-50">
+            
+            <div class="flex justify-end gap-2">
+                <button onclick="fecharModalCheckin()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">Cancelar</button>
+                <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Validar CSV</button>
+            </div>
+        </div>
+    </div>
+
     <main class="flex-1 overflow-hidden p-6 flex flex-col max-w-[1400px] mx-auto w-full">
         <div class="flex flex-wrap gap-4 justify-between items-center bg-white p-4 rounded shadow-sm border border-slate-200 shrink-0">
             
-            <label class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded shadow cursor-pointer transition text-sm font-bold flex items-center gap-2">
+            <button onclick="abrirModalCheckin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded shadow transition text-sm font-bold flex items-center gap-2">
                 ▶ Anexar CSV (Check-in)
-                <input type="file" id="csvFile" accept=".csv" class="hidden">
-            </label>
+            </button>
             
             <div class="flex flex-wrap gap-4 items-center text-sm font-medium">
                 <div class="flex gap-3 mr-2 bg-slate-50 p-2 rounded border border-slate-100">
@@ -47,26 +64,11 @@
                 </div>
                 
                 <select id="filtroAno" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026" selected>2026</option>
-                    <option value="2027">2027</option>
-                    <option value="2028">2028</option>
+                    <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
                 </select>
 
                 <select id="filtroMes" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
-                    <option value="01">Janeiro</option>
-                    <option value="02">Fevereiro</option>
-                    <option value="03">Março</option>
-                    <option value="04">Abril</option>
-                    <option value="05" selected>Maio</option>
-                    <option value="06">Junho</option>
-                    <option value="07">Julho</option>
-                    <option value="08">Agosto</option>
-                    <option value="09">Setembro</option>
-                    <option value="10">Outubro</option>
-                    <option value="11">Novembro</option>
-                    <option value="12">Dezembro</option>
+                    <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05" selected>Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
                 </select>
 
                 <select id="filtroParte" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
@@ -79,10 +81,8 @@
         <div class="mt-4 bg-white rounded shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
             <div class="overflow-x-auto table-scroll flex-1 relative">
                 <table class="w-full text-sm text-center border-collapse">
-                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0 z-10 shadow-sm" id="matrizHead">
-                        </thead>
-                    <tbody class="divide-y divide-slate-200" id="matrizBody">
-                        </tbody>
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0 z-10 shadow-sm" id="matrizHead"></thead>
+                    <tbody class="divide-y divide-slate-200" id="matrizBody"></tbody>
                 </table>
             </div>
         </div>
@@ -113,37 +113,27 @@
 
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
         let dadosLocais = [];
-
-       // ==========================================
-        // 3. CONTROLE DO MODAL E CONFIGURAÇÃO GLOBAL (SUPABASE)
-        // ==========================================
         let dataMestreGlobal = new Date().toISOString().split('T')[0];
 
+        // ==========================================
+        // 3. CONTROLE DOS MODAIS
+        // ==========================================
         function abrirModal() { document.getElementById('configModal').classList.remove('hidden'); }
         function fecharModal() { document.getElementById('configModal').classList.add('hidden'); }
         
         async function salvarConfig() {
             const novaData = document.getElementById('dataConfig').value;
             fecharModal();
-            
-            // Atualiza a data para TODOS os usuários no banco
-            const { error } = await banco.from('configuracoes')
-                                         .update({ data_mestre: novaData })
-                                         .eq('id', 1);
-            if (error) {
-                alert("Erro ao salvar configuração global.");
-                console.error(error);
-            }
+            const { error } = await banco.from('configuracoes').update({ data_mestre: novaData }).eq('id', 1);
+            if(error) alert("Erro ao salvar configuração global.");
         }
 
-        async function carregarConfiguracaoGlobal() {
-            const { data, error } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
-            if (!error && data) {
-                dataMestreGlobal = data.data_mestre;
-                document.getElementById('dataConfig').value = dataMestreGlobal;
-                construirMatriz(); // Recalcula a tela sempre que a data global mudar
-            }
+        function abrirModalCheckin() {
+            document.getElementById('dataRecebimento').value = new Date().toISOString().split('T')[0];
+            document.getElementById('csvFileInput').value = "";
+            document.getElementById('checkinModal').classList.remove('hidden');
         }
+        function fecharModalCheckin() { document.getElementById('checkinModal').classList.add('hidden'); }
 
         // ==========================================
         // 4. LÓGICA DE DATAS E RENDERIZAÇÃO DA MATRIZ
@@ -163,18 +153,14 @@
             const tbody = document.getElementById('matrizBody');
             
             let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-20">Unidade</th>`;
-            for (let d = diaInicio; d <= diaFim; d++) {
-                thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${d.toString().padStart(2, '0')}</th>`;
-            }
+            for (let d = diaInicio; d <= diaFim; d++) thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${d.toString().padStart(2, '0')}</th>`;
             thHTML += `</tr>`;
             thead.innerHTML = thHTML;
 
             let tbHTML = '';
             unidadesFinais.forEach(unidade => {
                 tbHTML += `<tr class="hover:bg-blue-50 transition"><td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">${unidade}</td>`;
-                for (let d = diaInicio; d <= diaFim; d++) {
-                    tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
-                }
+                for (let d = diaInicio; d <= diaFim; d++) tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
                 tbHTML += `</tr>`;
             });
             tbody.innerHTML = tbHTML;
@@ -186,8 +172,8 @@
         document.getElementById('filtroMes').addEventListener('change', construirMatriz);
         document.getElementById('filtroParte').addEventListener('change', construirMatriz);
 
-       // ==========================================
-        // 5. PROCESSAMENTO E CHECK-IN DE CSV
+        // ==========================================
+        // 5. PROCESSAMENTO DE CSV (MÉTODO BLINDADO)
         // ==========================================
         function normalizarUnidade(nome) {
             const n = nome.trim().toUpperCase();
@@ -196,8 +182,8 @@
 
         function calcularPrazo(dataInicialStr) {
             if(!dataInicialStr) return new Date();
-            // Garante que o fuso não mude o dia
-            let data = new Date(dataInicialStr + "T00:00:00"); 
+            let strLimpa = dataInicialStr.includes('T') ? dataInicialStr.split('T')[0] : dataInicialStr;
+            let data = new Date(strLimpa + "T12:00:00"); // 12h resolve bugs de fuso horário
             let diasAdicionados = 0;
             while (diasAdicionados < 5) {
                 data.setDate(data.getDate() + 1);
@@ -210,51 +196,58 @@
             return data;
         }
 
-        document.getElementById('csvFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if(!file) return;
+        function processarCheckin() {
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            const dataRecebimentoReal = document.getElementById('dataRecebimento').value;
+
+            if(!file) { alert("Anexe o arquivo CSV primeiro."); return; }
+            if(!dataRecebimentoReal) { alert("Escolha a data do recebimento."); return; }
 
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                delimiter: ";", // O padrão do seu arquivo
+                delimiter: ";",
                 transformHeader: function(h) {
-                    // Limpa BOM invisível, espaços e aspas do cabeçalho do seu sistema
-                    return h.replace(/^\uFEFF/, '').trim().replace(/["']/g, '');
+                    // Força bruta: Remove aspas, espaços e formata tudo para minúsculo
+                    return h.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
                 },
                 complete: async function(results) {
                     const data = results.data;
-                    if(data.length === 0) { alert("O CSV está vazio ou inválido."); return; }
+                    if(data.length === 0) { alert("CSV vazio ou inválido."); return; }
 
-                    // Pega a primeira linha válida para validação
-                    let linhaValida = data.find(r => r['Unidade'] && r['Atendimento']);
-                    if(!linhaValida) { alert("Erro: Colunas 'Unidade' ou 'Atendimento' não encontradas no CSV."); return; }
+                    // Como limpamos o cabeçalho, as colunas viraram 'unidade' e 'atendimento'
+                    let linhaValida = data.find(r => r['unidade'] && r['atendimento']);
+                    if(!linhaValida) { alert("Colunas 'Unidade' ou 'Atendimento' não encontradas."); return; }
 
-                    let unidadeLida = linhaValida['Unidade'];
-                    let dataMaloteLida = linhaValida['DataAtendimento'];
-                    
-                    // Confirmação (OK / Cancelar)
-                    const msg = `✅ CSV Lido com Sucesso!\n\n📌 Unidade: ${unidadeLida}\n📅 Data do Malote: ${dataMaloteLida}\n📦 Total de Atendimentos: ${data.length}\n\nDeseja confirmar o check-in?`;
-                    if(!confirm(msg)) {
-                        document.getElementById('csvFile').value = ""; // Limpa se cancelar
-                        return;
-                    }
+                    let unidadeLida = linhaValida['unidade'];
+                    let dataMaloteLida = linhaValida['dataatendimento'] || "Não informada";
+                    let dataVisual = dataRecebimentoReal.split('-').reverse().join('/');
+
+                    const msg = `✅ CSV Preparado!\n\n📌 Unidade: ${unidadeLida.toUpperCase()}\n📅 Data do Malote: ${dataMaloteLida}\n📦 Total Lidos: ${data.length}\n\n⚠️ Será registrado como recebido em: ${dataVisual}\n\nConfirmar gravação?`;
+                    if(!confirm(msg)) return;
 
                     let records = [];
                     let setAtendimentos = new Set();
+                    let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
                     
                     data.forEach(row => {
-                        if(!row['Unidade'] || !row['Atendimento']) return; 
-                        let unidadeNorm = normalizarUnidade(row['Unidade']);
-                        let id = `${unidadeNorm}-${row['Atendimento']}`;
+                        let u = row['unidade'];
+                        let a = row['atendimento'];
+                        let dm = row['dataatendimento'];
+                        if(!u || !a) return; 
+                        
+                        let unidadeNorm = normalizarUnidade(u);
+                        let id = `${unidadeNorm}-${a}`;
                         
                         if (!setAtendimentos.has(id)) {
                             setAtendimentos.add(id);
                             records.push({
                                 id_unico: id,
                                 unidade: unidadeNorm,
-                                atendimento: row['Atendimento'],
-                                data_malote: row['DataAtendimento'],
+                                atendimento: a,
+                                data_malote: dm,
+                                data_checkin: dataRetroativaIso, // Salva com a data retroativa
                                 status: "RECEBIDO"
                             });
                         }
@@ -262,19 +255,19 @@
 
                     const { error } = await banco.from('malotes').upsert(records);
                     if(!error) {
-                        document.getElementById('csvFile').value = ""; 
+                        fecharModalCheckin();
                     } else {
-                        alert('Erro ao gravar no banco. Verifique o console.');
-                        console.error(error);
+                        alert('Erro ao gravar no banco. Verifique o F12.');
                     }
                 }
             });
-        });
+        }
 
         // ==========================================
         // 6. BUSCA, EXCLUSÃO E CÁLCULO DINÂMICO REAL-TIME
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
+            if(!dataStr) return null;
             if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
             if(dataStr.includes('-')) return parseInt(dataStr.split('-')[2].substring(0,2), 10);
             return null;
@@ -295,22 +288,21 @@
             const diaInicio = parte === "1" ? 1 : 16;
             const diaFim = parte === "1" ? 15 : obterDiasDoMes(ano, mes);
 
-            let inicioOperacao = new Date(dataMestreGlobal + "T00:00:00");
+            let inicioOperacao = new Date(dataMestreGlobal + "T12:00:00");
             let hoje = new Date();
 
-            // PASSO 1: Pré-calcular status padrão (Atrasado ou Aguardando) para células vazias
+            // PASSO 1: Pré-calcular status padrão (Atrasado / Aguardando)
             unidadesFinais.forEach(unidade => {
                 for (let d = diaInicio; d <= diaFim; d++) {
                     let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
                     let celula = document.getElementById(idCelula);
                     if(!celula) continue;
 
-                    let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(d).padStart(2,'0')}T00:00:00`;
-                    let dataCelula = new Date(dataCelulaStr);
+                    let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    let dataCelula = new Date(dataCelulaStr + "T12:00:00");
 
-                    // Só calcula se o dia for igual ou posterior à data de configuração
                     if (dataCelula >= inicioOperacao) {
-                        let dataPrazo = calcularPrazo(dataCelulaStr.split('T')[0]);
+                        let dataPrazo = calcularPrazo(dataCelulaStr);
                         dataPrazo.setHours(23, 59, 59, 999);
 
                         if (hoje > dataPrazo) {
@@ -319,33 +311,29 @@
                             celula.innerHTML = `<div class="w-full h-full bg-slate-200 rounded opacity-50" title="Aguardando (No prazo até: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
                         }
                     } else {
-                        celula.innerHTML = ''; // Dias anteriores à configuração ficam em branco
+                        celula.innerHTML = ''; 
                     }
                 }
             });
 
-            // PASSO 2: Sobrescrever com os check-ins realizados
+            // PASSO 2: Sobrescrever com malotes já checados
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
-                
                 if(diaMalote >= diaInicio && diaMalote <= diaFim) {
                     let idCelula = `cel-${linha.unidade.replace(/\s+/g, '')}-${diaMalote}`;
                     let celula = document.getElementById(idCelula);
                     
                     if(celula && celula.innerHTML !== '') {
                         let dataCheckin = new Date(linha.data_checkin);
-                        
-                        // Prazo do malote específico para saber se entregou com atraso
-                        let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(diaMalote).padStart(2,'0')}T00:00:00`;
-                        let prazoDesteMalote = calcularPrazo(dataCelulaStr.split('T')[0]);
+                        let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(diaMalote).padStart(2,'0')}`;
+                        let prazoDesteMalote = calcularPrazo(dataCelulaStr);
                         prazoDesteMalote.setHours(23, 59, 59, 999);
 
                         let corFundo = (dataCheckin <= prazoDesteMalote) ? 'bg-green-500' : 'bg-yellow-400';
-
                         let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
                         let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
 
-                        // Injeta quadrado colorido com o X oculto (aparece no hover)
+                        // Adicionado o botão X (Excluir) que aparece ao passar o mouse
                         celula.innerHTML = `
                             <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90 relative group" title="Entregue em: ${diaEntrega}/${mesEntrega}">
                                 ${diaEntrega}/${mesEntrega}
@@ -372,28 +360,20 @@
             }
         }
 
-        // Real-time
-        banco.channel('canal-malotes')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
-              carregarDadosSupabase(); 
-          }).subscribe();
-
-        banco.channel('canal-config')
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracoes' }, payload => {
-              dataMestreGlobal = payload.new.data_mestre;
-              document.getElementById('dataConfig').value = dataMestreGlobal;
-              construirMatriz(); 
-          }).subscribe();
+        banco.channel('canal-malotes').on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => { carregarDadosSupabase(); }).subscribe();
+        banco.channel('canal-config').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracoes' }, payload => {
+            dataMestreGlobal = payload.new.data_mestre;
+            document.getElementById('dataConfig').value = dataMestreGlobal;
+            construirMatriz(); 
+        }).subscribe();
 
         // INIT
         async function iniciarDashboard() {
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
             if(data) dataMestreGlobal = data.data_mestre;
-            
             document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
-
         iniciarDashboard();
     </script>
 </body>
