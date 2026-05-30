@@ -304,7 +304,7 @@
             };
         }
 
-        // ==========================================
+      // ==========================================
         // 6. BUSCA, EXCLUSÃO E CÁLCULO DINÂMICO REAL-TIME
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
@@ -316,12 +316,8 @@
 
         async function deletarCheckin(unidade, dataMalote) {
             if(confirm(`Tem certeza que deseja CANCELAR o check-in de:\nUnidade: ${unidade}\nData Malote: ${dataMalote}?`)) {
-                // Ao excluir, apaga todos os atendimentos daquela unidade e data de uma vez
                 const { error } = await banco.from('malotes').delete().eq('unidade', unidade).eq('data_malote', dataMalote);
-                if(error) {
-                    alert('Erro ao excluir. Verifique se você rodou o comando de permissão DELETE no Supabase.');
-                    console.error(error);
-                }
+                if(error) alert('Erro ao excluir. Verifique permissões no Supabase.');
             }
         }
 
@@ -336,7 +332,7 @@
             let inicioOperacao = new Date(dataMestreGlobal + "T12:00:00");
             let hoje = new Date();
 
-            // PASSO 1: Pré-calcular status padrão (Atrasado / Aguardando)
+            // PASSO 1: Pré-calcular status padrão
             unidadesFinais.forEach(unidade => {
                 for (let d = diaInicio; d <= diaFim; d++) {
                     let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
@@ -361,7 +357,7 @@
                 }
             });
 
-            // PASSO 2: Agrupar atendimentos para saber a quantidade total do malote
+            // PASSO 2: Agrupar atendimentos
             let malotesAgrupados = {};
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
@@ -371,16 +367,16 @@
                         malotesAgrupados[chave] = {
                             unidade: linha.unidade,
                             diaMalote: diaMalote,
-                            data_malote: linha.data_malote, // Data original do lote (ex: 2026-05-28)
+                            data_malote: linha.data_malote,
                             data_checkin: linha.data_checkin,
                             quantidade: 0
                         };
                     }
-                    malotesAgrupados[chave].quantidade++; // Soma +1 para cada atendimento
+                    malotesAgrupados[chave].quantidade++;
                 }
             });
 
-            // PASSO 3: Sobrescrever com os malotes recebidos (Injetando a Quantidade)
+            // PASSO 3: Sobrescrever (Flex-col: Data em cima, Quantidade embaixo)
             Object.values(malotesAgrupados).forEach(grupo => {
                 let idCelula = `cel-${grupo.unidade.replace(/\s+/g, '')}-${grupo.diaMalote}`;
                 let celula = document.getElementById(idCelula);
@@ -395,11 +391,11 @@
                     let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
                     let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
 
-                    // Insere a Quantidade no meio e os detalhes no balãozinho (title)
                     celula.innerHTML = `
-                        <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[12px] font-bold text-white/90 relative group" title="Data da Entrega: ${diaEntrega}/${mesEntrega}\nTotal de Atendimentos: ${grupo.quantidade}">
-                            ${grupo.quantidade}
-                            <button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 items-center justify-center text-[10px] shadow hover:bg-red-800 transition z-10" title="Cancelar Check-in">✕</button>
+                        <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex flex-col items-center justify-center text-white/90 relative group p-0.5" title="Data da Entrega: ${diaEntrega}/${mesEntrega}\nTotal de Atendimentos: ${grupo.quantidade}">
+                            <span class="text-[9px] leading-tight font-medium opacity-90">${diaEntrega}/${mesEntrega}</span>
+                            <span class="text-[12px] font-bold leading-tight">${grupo.quantidade}</span>
+                            <button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-4 h-4 items-center justify-center text-[10px] shadow hover:bg-red-800 transition z-10" title="Cancelar Check-in">✕</button>
                         </div>
                     `;
                 }
@@ -428,13 +424,34 @@
             construirMatriz(); 
         }).subscribe();
 
+        // FUNÇÃO NOVA: Força os filtros para o dia atual
+        function definirFiltrosAtuais() {
+            const hoje = new Date();
+            const ano = hoje.getFullYear().toString();
+            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dia = hoje.getDate();
+            const parte = dia > 15 ? "2" : "1";
+
+            const selectAno = document.getElementById('filtroAno');
+            const selectMes = document.getElementById('filtroMes');
+            const selectParte = document.getElementById('filtroParte');
+
+            if(selectAno.querySelector(`option[value="${ano}"]`)) selectAno.value = ano;
+            if(selectMes.querySelector(`option[value="${mes}"]`)) selectMes.value = mes;
+            selectParte.value = parte;
+        }
+
         // INIT
         async function iniciarDashboard() {
+            definirFiltrosAtuais(); // Roda na hora que a página abre
+            
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
             if(data) dataMestreGlobal = data.data_mestre;
+            
             document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
+        
         iniciarDashboard();
     </script>
 </body>
