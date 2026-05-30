@@ -316,8 +316,12 @@
 
         async function deletarCheckin(unidade, dataMalote) {
             if(confirm(`Tem certeza que deseja CANCELAR o check-in de:\nUnidade: ${unidade}\nData Malote: ${dataMalote}?`)) {
+                // Ao excluir, apaga todos os atendimentos daquela unidade e data de uma vez
                 const { error } = await banco.from('malotes').delete().eq('unidade', unidade).eq('data_malote', dataMalote);
-                if(error) alert('Erro ao excluir.');
+                if(error) {
+                    alert('Erro ao excluir. Verifique se você rodou o comando de permissão DELETE no Supabase.');
+                    console.error(error);
+                }
             }
         }
 
@@ -357,31 +361,47 @@
                 }
             });
 
-            // PASSO 2: Sobrescrever com malotes já checados
+            // PASSO 2: Agrupar atendimentos para saber a quantidade total do malote
+            let malotesAgrupados = {};
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
                 if(diaMalote >= diaInicio && diaMalote <= diaFim) {
-                    let idCelula = `cel-${linha.unidade.replace(/\s+/g, '')}-${diaMalote}`;
-                    let celula = document.getElementById(idCelula);
-                    
-                    if(celula && celula.innerHTML !== '') {
-                        let dataCheckin = new Date(linha.data_checkin);
-                        let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(diaMalote).padStart(2,'0')}`;
-                        let prazoDesteMalote = calcularPrazo(dataCelulaStr);
-                        prazoDesteMalote.setHours(23, 59, 59, 999);
-
-                        let corFundo = (dataCheckin <= prazoDesteMalote) ? 'bg-green-500' : 'bg-yellow-400';
-                        let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
-                        let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
-
-                        // Adicionado o botão X (Excluir) que aparece ao passar o mouse
-                        celula.innerHTML = `
-                            <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90 relative group" title="Entregue em: ${diaEntrega}/${mesEntrega}">
-                                ${diaEntrega}/${mesEntrega}
-                                <button onclick="deletarCheckin('${linha.unidade}', '${linha.data_malote}')" class="hidden group-hover:flex absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 items-center justify-center text-[10px] shadow hover:bg-red-800 transition z-10" title="Cancelar Check-in">✕</button>
-                            </div>
-                        `;
+                    let chave = `${linha.unidade}-${diaMalote}`;
+                    if(!malotesAgrupados[chave]) {
+                        malotesAgrupados[chave] = {
+                            unidade: linha.unidade,
+                            diaMalote: diaMalote,
+                            data_malote: linha.data_malote, // Data original do lote (ex: 2026-05-28)
+                            data_checkin: linha.data_checkin,
+                            quantidade: 0
+                        };
                     }
+                    malotesAgrupados[chave].quantidade++; // Soma +1 para cada atendimento
+                }
+            });
+
+            // PASSO 3: Sobrescrever com os malotes recebidos (Injetando a Quantidade)
+            Object.values(malotesAgrupados).forEach(grupo => {
+                let idCelula = `cel-${grupo.unidade.replace(/\s+/g, '')}-${grupo.diaMalote}`;
+                let celula = document.getElementById(idCelula);
+                
+                if(celula && celula.innerHTML !== '') {
+                    let dataCheckin = new Date(grupo.data_checkin);
+                    let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(grupo.diaMalote).padStart(2,'0')}`;
+                    let prazoDesteMalote = calcularPrazo(dataCelulaStr);
+                    prazoDesteMalote.setHours(23, 59, 59, 999);
+
+                    let corFundo = (dataCheckin <= prazoDesteMalote) ? 'bg-green-500' : 'bg-yellow-400';
+                    let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
+                    let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
+
+                    // Insere a Quantidade no meio e os detalhes no balãozinho (title)
+                    celula.innerHTML = `
+                        <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[12px] font-bold text-white/90 relative group" title="Data da Entrega: ${diaEntrega}/${mesEntrega}\nTotal de Atendimentos: ${grupo.quantidade}">
+                            ${grupo.quantidade}
+                            <button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 items-center justify-center text-[10px] shadow hover:bg-red-800 transition z-10" title="Cancelar Check-in">✕</button>
+                        </div>
+                    `;
                 }
             });
         }
