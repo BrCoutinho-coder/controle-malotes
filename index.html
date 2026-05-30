@@ -196,7 +196,7 @@
             return data;
         }
 
-        function processarCheckin() {
+       function processarCheckin() {
             const fileInput = document.getElementById('csvFileInput');
             const file = fileInput.files[0];
             const dataRecebimentoReal = document.getElementById('dataRecebimento').value;
@@ -204,63 +204,104 @@
             if(!file) { alert("Anexe o arquivo CSV primeiro."); return; }
             if(!dataRecebimentoReal) { alert("Escolha a data do recebimento."); return; }
 
-            Papa.parse(file, {
-                header: true,
-                skipEmptyLines: true,
-                delimiter: ";",
-                transformHeader: function(h) {
-                    // Força bruta: Remove aspas, espaços e formata tudo para minúsculo
-                    return h.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
-                },
-                complete: async function(results) {
-                    const data = results.data;
-                    if(data.length === 0) { alert("CSV vazio ou inválido."); return; }
+            const reader = new FileReader();
+            reader.readAsText(file, 'UTF-16LE'); 
+            
+            reader.onload = async function(e) {
+                const text = e.target.result.replace(/\0/g, '');
+                const linhas = text.split(/\r?\n/);
+                
+                if (linhas.length < 2) { alert("CSV vazio ou sem dados suficientes."); return; }
 
-                    // Como limpamos o cabeçalho, as colunas viraram 'unidade' e 'atendimento'
-                    let linhaValida = data.find(r => r['unidade'] && r['atendimento']);
-                    if(!linhaValida) { alert("Colunas 'Unidade' ou 'Atendimento' não encontradas."); return; }
+                let idxUnidade = -1;
+                let idxAtendimento = -1;
+                let idxDataMalote = -1;
+                let linhaDadosInicio = 1;
 
-                    let unidadeLida = linhaValida['unidade'];
-                    let dataMaloteLida = linhaValida['dataatendimento'] || "Não informada";
-                    let dataVisual = dataRecebimentoReal.split('-').reverse().join('/');
-
-                    const msg = `✅ CSV Preparado!\n\n📌 Unidade: ${unidadeLida.toUpperCase()}\n📅 Data do Malote: ${dataMaloteLida}\n📦 Total Lidos: ${data.length}\n\n⚠️ Será registrado como recebido em: ${dataVisual}\n\nConfirmar gravação?`;
-                    if(!confirm(msg)) return;
-
-                    let records = [];
-                    let setAtendimentos = new Set();
-                    let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
+                for(let i = 0; i < Math.min(5, linhas.length); i++) {
+                    let colunas = linhas[i].split(';'); 
                     
-                    data.forEach(row => {
-                        let u = row['unidade'];
-                        let a = row['atendimento'];
-                        let dm = row['dataatendimento'];
-                        if(!u || !a) return; 
-                        
-                        let unidadeNorm = normalizarUnidade(u);
-                        let id = `${unidadeNorm}-${a}`;
-                        
-                        if (!setAtendimentos.has(id)) {
-                            setAtendimentos.add(id);
-                            records.push({
-                                id_unico: id,
-                                unidade: unidadeNorm,
-                                atendimento: a,
-                                data_malote: dm,
-                                data_checkin: dataRetroativaIso, // Salva com a data retroativa
-                                status: "RECEBIDO"
-                            });
-                        }
-                    });
-
-                    const { error } = await banco.from('malotes').upsert(records);
-                    if(!error) {
-                        fecharModalCheckin();
-                    } else {
-                        alert('Erro ao gravar no banco. Verifique o F12.');
+                    for(let c = 0; c < colunas.length; c++) {
+                        let celulaLimpa = colunas[c].toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if(celulaLimpa === 'unidade') idxUnidade = c;
+                        if(celulaLimpa === 'atendimento') idxAtendimento = c;
+                        if(celulaLimpa === 'dataatendimento' || celulaLimpa === 'data') idxDataMalote = c;
+                    }
+                    if(idxUnidade !== -1 && idxAtendimento !== -1) {
+                        linhaDadosInicio = i + 1; 
+                        break;
                     }
                 }
-            });
+
+                if(idxUnidade === -1 || idxAtendimento === -1) {
+                    alert("As colunas 'Unidade' e 'Atendimento' não foram encontradas.");
+                    return;
+                }
+
+                let registrosValidos = [];
+                let setAtendimentos = new Set();
+                let unidadeAviso = "";
+                let dataAviso = "";
+                let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
+
+                for(let i = linhaDadosInicio; i < linhas.length; i++) {
+                    if(!linhas[i].trim()) continue; 
+                    
+                    let colunas = linhas[i].split(';');
+                    if(colunas.length <= Math.max(idxUnidade, idxAtendimento)) continue;
+
+                    let u = colunas[idxUnidade].replace(/["']/g, '').trim();
+                    let a = colunas[idxAtendimento].replace(/["']/g, '').trim();
+                    let dm = idxDataMalote !== -1 && colunas[idxDataMalote] ? colunas[idxDataMalote].replace(/["']/g, '').trim() : "Não informada";
+
+                    if(!u || !a) continue;
+
+                    if(!unidadeAviso) { unidadeAviso = u; dataAviso = dm; }
+
+                    let unidadeNorm = normalizarUnidade(u);
+                    let id = `${unidadeNorm}-${a}`;
+                    
+                    // CORREÇÃO CRÍTICA DO ERRO 400: Converte DD/MM/YYYY para YYYY-MM-DD
+                    let dataMaloteBanco = dm;
+                    if(dm.includes('/')) {
+                        let partes = dm.split('/');
+                        if(partes.length === 3) dataMaloteBanco = `${partes[2]}-${partes[1]}-${partes[0]}`;
+                    }
+                    
+                    if (!setAtendimentos.has(id)) {
+                        setAtendimentos.add(id);
+                        registrosValidos.push({
+                            id_unico: id,
+                            unidade: unidadeNorm,
+                            atendimento: a,
+                            data_malote: dataMaloteBanco, // Enviando no padrão correto do PostgreSQL
+                            data_checkin: dataRetroativaIso, 
+                            status: "RECEBIDO"
+                        });
+                    }
+                }
+
+                if(registrosValidos.length === 0) {
+                    alert("Nenhum dado válido encontrado.");
+                    return;
+                }
+
+                let dataVisual = dataRecebimentoReal.split('-').reverse().join('/');
+                const msg = `✅ CSV Processado com Sucesso!\n\n📌 Unidade: ${unidadeAviso.toUpperCase()}\n📅 Data do Malote: ${dataAviso}\n📦 Total de Atendimentos: ${registrosValidos.length}\n\n⚠️ Check-in ficará registrado no dia: ${dataVisual}\n\nConfirmar gravação?`;
+                
+                if(!confirm(msg)) {
+                    document.getElementById('csvFileInput').value = '';
+                    return;
+                }
+
+                const { error } = await banco.from('malotes').upsert(registrosValidos);
+                if(!error) {
+                    fecharModalCheckin();
+                } else {
+                    alert('Erro ao gravar no banco. Verifique o console.');
+                    console.error(error);
+                }
+            };
         }
 
         // ==========================================
