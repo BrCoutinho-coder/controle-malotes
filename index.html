@@ -186,7 +186,7 @@
         document.getElementById('filtroMes').addEventListener('change', construirMatriz);
         document.getElementById('filtroParte').addEventListener('change', construirMatriz);
 
-        // ==========================================
+       // ==========================================
         // 5. PROCESSAMENTO E CHECK-IN DE CSV
         // ==========================================
         function normalizarUnidade(nome) {
@@ -195,7 +195,9 @@
         }
 
         function calcularPrazo(dataInicialStr) {
-            let data = new Date(dataInicialStr);
+            if(!dataInicialStr) return new Date();
+            // Garante que o fuso não mude o dia
+            let data = new Date(dataInicialStr + "T00:00:00"); 
             let diasAdicionados = 0;
             while (diasAdicionados < 5) {
                 data.setDate(data.getDate() + 1);
@@ -215,14 +217,28 @@
             Papa.parse(file, {
                 header: true,
                 skipEmptyLines: true,
-                delimiter: ";", // CORREÇÃO CRÍTICA PARA O SEU CSV
+                delimiter: ";", // O padrão do seu arquivo
+                transformHeader: function(h) {
+                    // Limpa BOM invisível, espaços e aspas do cabeçalho do seu sistema
+                    return h.replace(/^\uFEFF/, '').trim().replace(/["']/g, '');
+                },
                 complete: async function(results) {
                     const data = results.data;
-                    if(data.length === 0) { alert("O CSV está vazio ou o formato é inválido."); return; }
+                    if(data.length === 0) { alert("O CSV está vazio ou inválido."); return; }
 
-                    let unidadeLida = data[0]['Unidade'] || "Desconhecida";
-                    let dataMaloteLida = data[0]['DataAtendimento'] || "Desconhecida";
-                    alert(`✅ Malote Identificado!\nUnidade: ${unidadeLida}\nData do Malote: ${dataMaloteLida}\nRegistros lidos: ${data.length}\n\nEnviando...`);
+                    // Pega a primeira linha válida para validação
+                    let linhaValida = data.find(r => r['Unidade'] && r['Atendimento']);
+                    if(!linhaValida) { alert("Erro: Colunas 'Unidade' ou 'Atendimento' não encontradas no CSV."); return; }
+
+                    let unidadeLida = linhaValida['Unidade'];
+                    let dataMaloteLida = linhaValida['DataAtendimento'];
+                    
+                    // Confirmação (OK / Cancelar)
+                    const msg = `✅ CSV Lido com Sucesso!\n\n📌 Unidade: ${unidadeLida}\n📅 Data do Malote: ${dataMaloteLida}\n📦 Total de Atendimentos: ${data.length}\n\nDeseja confirmar o check-in?`;
+                    if(!confirm(msg)) {
+                        document.getElementById('csvFile').value = ""; // Limpa se cancelar
+                        return;
+                    }
 
                     let records = [];
                     let setAtendimentos = new Set();
@@ -234,30 +250,29 @@
                         
                         if (!setAtendimentos.has(id)) {
                             setAtendimentos.add(id);
-                            // O status não é mais travado aqui, apenas a data de checkin real
                             records.push({
                                 id_unico: id,
                                 unidade: unidadeNorm,
                                 atendimento: row['Atendimento'],
                                 data_malote: row['DataAtendimento'],
-                                status: "RECEBIDO" 
+                                status: "RECEBIDO"
                             });
                         }
                     });
 
                     const { error } = await banco.from('malotes').upsert(records);
                     if(!error) {
-                        alert('Check-in finalizado!');
                         document.getElementById('csvFile').value = ""; 
                     } else {
-                        alert('Erro ao gravar no banco. Verifique o F12.');
+                        alert('Erro ao gravar no banco. Verifique o console.');
+                        console.error(error);
                     }
                 }
             });
         });
 
-       // ==========================================
-        // 6. BUSCA DE DADOS, CÁLCULO DINÂMICO E REAL-TIME
+        // ==========================================
+        // 6. BUSCA, EXCLUSÃO E CÁLCULO DINÂMICO REAL-TIME
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
             if(dataStr.includes('/')) return parseInt(dataStr.split('/')[0], 10);
@@ -265,15 +280,51 @@
             return null;
         }
 
+        async function deletarCheckin(unidade, dataMalote) {
+            if(confirm(`Tem certeza que deseja CANCELAR o check-in de:\nUnidade: ${unidade}\nData Malote: ${dataMalote}?`)) {
+                const { error } = await banco.from('malotes').delete().eq('unidade', unidade).eq('data_malote', dataMalote);
+                if(error) alert('Erro ao excluir.');
+            }
+        }
+
         function preencherMatrizComDados() {
+            const ano = document.getElementById('filtroAno').value;
+            const mes = document.getElementById('filtroMes').value;
             const parte = document.getElementById('filtroParte').value;
+            
             const diaInicio = parte === "1" ? 1 : 16;
-            const diaFim = parte === "1" ? 15 : 31;
+            const diaFim = parte === "1" ? 15 : obterDiasDoMes(ano, mes);
 
-            // Usa a Data Mestre Global que foi carregada do banco
-            const dataPrazo = calcularPrazo(dataMestreGlobal);
-            dataPrazo.setHours(23, 59, 59, 999);
+            let inicioOperacao = new Date(dataMestreGlobal + "T00:00:00");
+            let hoje = new Date();
 
+            // PASSO 1: Pré-calcular status padrão (Atrasado ou Aguardando) para células vazias
+            unidadesFinais.forEach(unidade => {
+                for (let d = diaInicio; d <= diaFim; d++) {
+                    let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
+                    let celula = document.getElementById(idCelula);
+                    if(!celula) continue;
+
+                    let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(d).padStart(2,'0')}T00:00:00`;
+                    let dataCelula = new Date(dataCelulaStr);
+
+                    // Só calcula se o dia for igual ou posterior à data de configuração
+                    if (dataCelula >= inicioOperacao) {
+                        let dataPrazo = calcularPrazo(dataCelulaStr.split('T')[0]);
+                        dataPrazo.setHours(23, 59, 59, 999);
+
+                        if (hoje > dataPrazo) {
+                            celula.innerHTML = `<div class="w-full h-full bg-red-500 rounded shadow-sm opacity-80 cursor-not-allowed" title="Atrasado (Prazo era: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
+                        } else {
+                            celula.innerHTML = `<div class="w-full h-full bg-slate-200 rounded opacity-50" title="Aguardando (No prazo até: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
+                        }
+                    } else {
+                        celula.innerHTML = ''; // Dias anteriores à configuração ficam em branco
+                    }
+                }
+            });
+
+            // PASSO 2: Sobrescrever com os check-ins realizados
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
                 
@@ -281,15 +332,26 @@
                     let idCelula = `cel-${linha.unidade.replace(/\s+/g, '')}-${diaMalote}`;
                     let celula = document.getElementById(idCelula);
                     
-                    if(celula) {
+                    if(celula && celula.innerHTML !== '') {
                         let dataCheckin = new Date(linha.data_checkin);
-                        // Lógica: Verde se entregue dentro do prazo, Amarelo se passou do prazo
-                        let corFundo = (dataCheckin <= dataPrazo) ? 'bg-green-500' : 'bg-yellow-400';
+                        
+                        // Prazo do malote específico para saber se entregou com atraso
+                        let dataCelulaStr = `${ano}-${mes.padStart(2,'0')}-${String(diaMalote).padStart(2,'0')}T00:00:00`;
+                        let prazoDesteMalote = calcularPrazo(dataCelulaStr.split('T')[0]);
+                        prazoDesteMalote.setHours(23, 59, 59, 999);
+
+                        let corFundo = (dataCheckin <= prazoDesteMalote) ? 'bg-green-500' : 'bg-yellow-400';
 
                         let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
                         let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
 
-                        celula.innerHTML = `<div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90" title="Entregue em: ${diaEntrega}/${mesEntrega}">${diaEntrega}/${mesEntrega}</div>`;
+                        // Injeta quadrado colorido com o X oculto (aparece no hover)
+                        celula.innerHTML = `
+                            <div class="w-full h-full ${corFundo} rounded shadow-sm opacity-90 flex items-center justify-center text-[10px] font-bold text-white/90 relative group" title="Entregue em: ${diaEntrega}/${mesEntrega}">
+                                ${diaEntrega}/${mesEntrega}
+                                <button onclick="deletarCheckin('${linha.unidade}', '${linha.data_malote}')" class="hidden group-hover:flex absolute -top-1 -right-1 bg-red-600 text-white rounded-full w-4 h-4 items-center justify-center text-[10px] shadow hover:bg-red-800 transition z-10" title="Cancelar Check-in">✕</button>
+                            </div>
+                        `;
                     }
                 }
             });
@@ -310,23 +372,21 @@
             }
         }
 
-        // Real-time: Escuta mudanças na tabela de Malotes
+        // Real-time
         banco.channel('canal-malotes')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
               carregarDadosSupabase(); 
           }).subscribe();
 
-        // Real-time: Escuta mudanças na Data Global (Configurações)
         banco.channel('canal-config')
           .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracoes' }, payload => {
               dataMestreGlobal = payload.new.data_mestre;
               document.getElementById('dataConfig').value = dataMestreGlobal;
-              construirMatriz(); // Recalcula as cores de todos instantaneamente
+              construirMatriz(); 
           }).subscribe();
 
-        // INIT INICIAL
+        // INIT
         async function iniciarDashboard() {
-            // Primeiro busca a config global no banco
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
             if(data) dataMestreGlobal = data.data_mestre;
             
