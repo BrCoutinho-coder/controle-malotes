@@ -10,6 +10,8 @@
     <style>
         .table-scroll::-webkit-scrollbar { height: 8px; }
         .table-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+        .linha-destacada { background-color: #dbeafe !important; outline: 2px solid #3b82f6; }
+        .cursor-pointer { cursor: pointer; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col">
@@ -158,11 +160,7 @@
             thead.innerHTML = thHTML;
 
             let tbHTML = '';
-            unidadesFinais.forEach(unidade => {
-                tbHTML += `<tr class="hover:bg-blue-50 transition"><td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">${unidade}</td>`;
-                for (let d = diaInicio; d <= diaFim; d++) tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
-                tbHTML += `</tr>`;
-            });
+                          tbHTML += `</tr>`;
             tbody.innerHTML = tbHTML;
 
             preencherMatrizComDados();
@@ -451,7 +449,13 @@
             document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
-        
+        function destacarLinha(elementoClicado) {
+            // Remove o destaque de todas as linhas da tabela
+            document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada'));
+            
+            // Aplica o destaque na linha clicada
+            elementoClicado.classList.add('linha-destacada');
+        }
         iniciarDashboard();
     </script>
 </body>
