@@ -449,14 +449,15 @@
             document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
-        function destacarLinha(elementoClicado) {
+       
+        iniciarDashboard();
+         function destacarLinha(elementoClicado) {
             // Remove o destaque de todas as linhas da tabela
             document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada'));
             
             // Aplica o destaque na linha clicada
             elementoClicado.classList.add('linha-destacada');
         }
-        iniciarDashboard();
     </script>
 </body>
 </html>
