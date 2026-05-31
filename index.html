@@ -385,21 +385,26 @@
             });
         }
 
-        // OTIMIZAÇÃO DE PERFORMANCE: O banco só retorna o mês/ano filtrado.
+       // OTIMIZAÇÃO DE PERFORMANCE: Filtra usando maior/menor para respeitar o tipo DATE
         async function carregarDadosSupabase() {
             const ano = document.getElementById('filtroAno').value;
             const mes = document.getElementById('filtroMes').value;
             
-            // Cria um filtro do tipo "2026-05-%" (Tudo que começa com 2026-05)
-            const filtroMesAno = `${ano}-${mes}-%`; 
+            // Descobre o último dia do mês atual para fechar a busca
+            const ultimoDia = new Date(ano, parseInt(mes), 0).getDate();
+            const dataInicio = `${ano}-${mes}-01`;
+            const dataFim = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
             
             const { data, error } = await banco.from('malotes')
                                                .select('*')
-                                               .like('data_malote', filtroMesAno);
+                                               .gte('data_malote', dataInicio)
+                                               .lte('data_malote', dataFim);
             
             if(!error && data) {
-                dadosLocais = data; // Já vem filtrado da nuvem, economizando memória do PC
+                dadosLocais = data; // Traz apenas os registros do mês atual
                 construirMatriz(); 
+            } else {
+                console.error("Erro na busca otimizada:", error);
             }
         }
 
