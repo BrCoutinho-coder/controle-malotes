@@ -5,12 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Controle de Malotes</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .table-scroll::-webkit-scrollbar { height: 8px; }
         .table-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-        .linha-destacada { background-color: #dbeafe !important; outline: 2px solid #3b82f6; }
+        .linha-destacada { background-color: #dbeafe !important; outline: 2px solid #3b82f6; z-index: 5; position: relative; }
         .cursor-pointer { cursor: pointer; }
     </style>
 </head>
@@ -18,7 +17,7 @@
 
     <header class="bg-[#1e3a8a] text-white p-4 shadow-md flex justify-between items-center shrink-0">
         <h1 class="text-xl font-bold tracking-wide">Controle de Malotes</h1>
-        <button onclick="abrirModal()" class="hover:text-blue-200 text-2xl" title="Configurações">⚙️</button>
+        <button onclick="abrirModal()" class="hover:text-blue-200 text-2xl transition-transform hover:scale-110 active:scale-95" title="Configurações">⚙️</button>
     </header>
 
     <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -27,8 +26,8 @@
             <label class="block text-sm font-medium text-slate-600 mb-1">A partir de qual data os prazos contam?</label>
             <input type="date" id="dataConfig" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700">
             <div class="flex justify-end gap-2">
-                <button onclick="fecharModal()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">Cancelar</button>
-                <button onclick="salvarConfig()" class="px-4 py-2 bg-[#1e3a8a] text-white rounded hover:bg-blue-700">Salvar</button>
+                <button onclick="fecharModal()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition">Cancelar</button>
+                <button onclick="salvarConfig()" class="px-4 py-2 bg-[#1e3a8a] text-white rounded hover:bg-blue-700 transition">Salvar</button>
             </div>
         </div>
     </div>
@@ -45,8 +44,8 @@
             <input type="file" id="csvFileInput" accept=".csv" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700 bg-slate-50">
             
             <div class="flex justify-end gap-2">
-                <button onclick="fecharModalCheckin()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300">Cancelar</button>
-                <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Validar CSV</button>
+                <button onclick="fecharModalCheckin()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 transition">Cancelar</button>
+                <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold transition">Validar CSV</button>
             </div>
         </div>
     </div>
@@ -54,7 +53,7 @@
     <main class="flex-1 overflow-hidden p-6 flex flex-col max-w-[1400px] mx-auto w-full">
         <div class="flex flex-wrap gap-4 justify-between items-center bg-white p-4 rounded shadow-sm border border-slate-200 shrink-0">
             
-            <button onclick="abrirModalCheckin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded shadow transition text-sm font-bold flex items-center gap-2">
+            <button onclick="abrirModalCheckin()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded shadow transition-transform hover:scale-105 active:scale-95 text-sm font-bold flex items-center gap-2">
                 ▶ Anexar CSV (Check-in)
             </button>
             
@@ -65,15 +64,15 @@
                     <span class="flex items-center gap-1"><span class="w-3 h-3 bg-red-500 rounded-sm"></span> Atrasado</span>
                 </div>
                 
-                <select id="filtroAno" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
-                    <option value="2024">2024</option><option value="2025">2025</option><option value="2026" selected>2026</option><option value="2027">2027</option>
+                <select id="filtroAno" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500 transition">
+                    <option value="2024">2024</option><option value="2025">2025</option><option value="2026">2026</option><option value="2027">2027</option>
                 </select>
 
-                <select id="filtroMes" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
-                    <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05" selected>Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
+                <select id="filtroMes" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500 transition">
+                    <option value="01">Janeiro</option><option value="02">Fevereiro</option><option value="03">Março</option><option value="04">Abril</option><option value="05">Maio</option><option value="06">Junho</option><option value="07">Julho</option><option value="08">Agosto</option><option value="09">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option>
                 </select>
 
-                <select id="filtroParte" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500">
+                <select id="filtroParte" class="border border-slate-300 px-3 py-2 rounded text-slate-700 bg-white shadow-sm focus:outline-none focus:border-blue-500 transition">
                     <option value="1">Parte 1 (Dias 1 a 15)</option>
                     <option value="2">Parte 2 (Dias 16 ao fim)</option>
                 </select>
@@ -83,7 +82,7 @@
         <div class="mt-4 bg-white rounded shadow-sm border border-slate-200 overflow-hidden flex-1 flex flex-col">
             <div class="overflow-x-auto table-scroll flex-1 relative">
                 <table class="w-full text-sm text-center border-collapse">
-                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0 z-10 shadow-sm" id="matrizHead"></thead>
+                    <thead class="bg-slate-100 text-slate-600 uppercase text-xs sticky top-0 z-20 shadow-sm" id="matrizHead"></thead>
                     <tbody class="divide-y divide-slate-200" id="matrizBody"></tbody>
                 </table>
             </div>
@@ -118,7 +117,7 @@
         let dataMestreGlobal = new Date().toISOString().split('T')[0];
 
         // ==========================================
-        // 3. CONTROLE DOS MODAIS
+        // 3. CONTROLE DOS MODAIS E DESTAQUE DE LINHA
         // ==========================================
         function abrirModal() { document.getElementById('configModal').classList.remove('hidden'); }
         function fecharModal() { document.getElementById('configModal').classList.add('hidden'); }
@@ -137,6 +136,11 @@
         }
         function fecharModalCheckin() { document.getElementById('checkinModal').classList.add('hidden'); }
 
+        function destacarLinha(elementoClicado) {
+            document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada'));
+            elementoClicado.classList.add('linha-destacada');
+        }
+
         // ==========================================
         // 4. LÓGICA DE DATAS E RENDERIZAÇÃO DA MATRIZ
         // ==========================================
@@ -154,13 +158,20 @@
             const thead = document.getElementById('matrizHead');
             const tbody = document.getElementById('matrizBody');
             
-            let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-20">Unidade</th>`;
+            let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-100 border-r border-slate-200 sticky left-0 z-30">Unidade</th>`;
             for (let d = diaInicio; d <= diaFim; d++) thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${d.toString().padStart(2, '0')}</th>`;
             thHTML += `</tr>`;
             thead.innerHTML = thHTML;
 
             let tbHTML = '';
-                          tbHTML += `</tr>`;
+            unidadesFinais.forEach(unidade => {
+                tbHTML += `<tr class="hover:bg-blue-50 transition cursor-pointer" onclick="destacarLinha(this)">
+                            <td class="px-4 py-3 font-semibold text-slate-700 text-left border-r border-slate-200 sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0] hover:text-blue-700">${unidade}</td>`;
+                for (let d = diaInicio; d <= diaFim; d++) {
+                    tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`;
+                }
+                tbHTML += `</tr>`;
+            });
             tbody.innerHTML = tbHTML;
 
             preencherMatrizComDados();
@@ -171,7 +182,7 @@
         document.getElementById('filtroParte').addEventListener('change', construirMatriz);
 
         // ==========================================
-        // 5. PROCESSAMENTO DE CSV (MÉTODO BLINDADO)
+        // 5. PROCESSAMENTO DE CSV (FORÇA BRUTA + CONVERSÃO DE DATA)
         // ==========================================
         function normalizarUnidade(nome) {
             const n = nome.trim().toUpperCase();
@@ -181,7 +192,7 @@
         function calcularPrazo(dataInicialStr) {
             if(!dataInicialStr) return new Date();
             let strLimpa = dataInicialStr.includes('T') ? dataInicialStr.split('T')[0] : dataInicialStr;
-            let data = new Date(strLimpa + "T12:00:00"); // 12h resolve bugs de fuso horário
+            let data = new Date(strLimpa + "T12:00:00"); 
             let diasAdicionados = 0;
             while (diasAdicionados < 5) {
                 data.setDate(data.getDate() + 1);
@@ -194,7 +205,7 @@
             return data;
         }
 
-       function processarCheckin() {
+        function processarCheckin() {
             const fileInput = document.getElementById('csvFileInput');
             const file = fileInput.files[0];
             const dataRecebimentoReal = document.getElementById('dataRecebimento').value;
@@ -218,7 +229,6 @@
 
                 for(let i = 0; i < Math.min(5, linhas.length); i++) {
                     let colunas = linhas[i].split(';'); 
-                    
                     for(let c = 0; c < colunas.length; c++) {
                         let celulaLimpa = colunas[c].toLowerCase().replace(/[^a-z0-9]/g, '');
                         if(celulaLimpa === 'unidade') idxUnidade = c;
@@ -232,7 +242,7 @@
                 }
 
                 if(idxUnidade === -1 || idxAtendimento === -1) {
-                    alert("As colunas 'Unidade' e 'Atendimento' não foram encontradas.");
+                    alert("As colunas 'Unidade' e 'Atendimento' não foram encontradas. Verifique a exportação do sistema.");
                     return;
                 }
 
@@ -259,7 +269,6 @@
                     let unidadeNorm = normalizarUnidade(u);
                     let id = `${unidadeNorm}-${a}`;
                     
-                    // CORREÇÃO CRÍTICA DO ERRO 400: Converte DD/MM/YYYY para YYYY-MM-DD
                     let dataMaloteBanco = dm;
                     if(dm.includes('/')) {
                         let partes = dm.split('/');
@@ -272,7 +281,7 @@
                             id_unico: id,
                             unidade: unidadeNorm,
                             atendimento: a,
-                            data_malote: dataMaloteBanco, // Enviando no padrão correto do PostgreSQL
+                            data_malote: dataMaloteBanco, 
                             data_checkin: dataRetroativaIso, 
                             status: "RECEBIDO"
                         });
@@ -296,13 +305,13 @@
                 if(!error) {
                     fecharModalCheckin();
                 } else {
-                    alert('Erro ao gravar no banco. Verifique o console.');
+                    alert('Erro ao gravar no banco. Pressione F12 para inspecionar.');
                     console.error(error);
                 }
             };
         }
 
-      // ==========================================
+        // ==========================================
         // 6. BUSCA, EXCLUSÃO E CÁLCULO DINÂMICO REAL-TIME
         // ==========================================
         function extrairDiaDaStringData(dataStr) {
@@ -315,7 +324,7 @@
         async function deletarCheckin(unidade, dataMalote) {
             if(confirm(`Tem certeza que deseja CANCELAR o check-in de:\nUnidade: ${unidade}\nData Malote: ${dataMalote}?`)) {
                 const { error } = await banco.from('malotes').delete().eq('unidade', unidade).eq('data_malote', dataMalote);
-                if(error) alert('Erro ao excluir. Verifique permissões no Supabase.');
+                if(error) alert('Erro ao excluir. Verifique se a permissão DELETE foi ativada no Supabase.');
             }
         }
 
@@ -330,7 +339,6 @@
             let inicioOperacao = new Date(dataMestreGlobal + "T12:00:00");
             let hoje = new Date();
 
-            // PASSO 1: Pré-calcular status padrão
             unidadesFinais.forEach(unidade => {
                 for (let d = diaInicio; d <= diaFim; d++) {
                     let idCelula = `cel-${unidade.replace(/\s+/g, '')}-${d}`;
@@ -347,7 +355,7 @@
                         if (hoje > dataPrazo) {
                             celula.innerHTML = `<div class="w-full h-full bg-red-500 rounded shadow-sm opacity-80 cursor-not-allowed" title="Atrasado (Prazo era: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
                         } else {
-                            celula.innerHTML = `<div class="w-full h-full bg-slate-200 rounded opacity-50" title="Aguardando (No prazo até: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
+                            celula.innerHTML = `<div class="w-full h-full bg-slate-100 rounded opacity-50" title="Aguardando (No prazo até: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
                         }
                     } else {
                         celula.innerHTML = ''; 
@@ -355,7 +363,6 @@
                 }
             });
 
-            // PASSO 2: Agrupar atendimentos
             let malotesAgrupados = {};
             dadosLocais.forEach(linha => {
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
@@ -374,7 +381,6 @@
                 }
             });
 
-            // PASSO 3: Sobrescrever (Flex-col: Data em cima, Quantidade embaixo)
             Object.values(malotesAgrupados).forEach(grupo => {
                 let idCelula = `cel-${grupo.unidade.replace(/\s+/g, '')}-${grupo.diaMalote}`;
                 let celula = document.getElementById(idCelula);
@@ -422,7 +428,7 @@
             construirMatriz(); 
         }).subscribe();
 
-        // FUNÇÃO NOVA: Força os filtros para o dia atual
+        // FORÇA FILTROS PARA A DATA ATUAL
         function definirFiltrosAtuais() {
             const hoje = new Date();
             const ano = hoje.getFullYear().toString();
@@ -441,7 +447,7 @@
 
         // INIT
         async function iniciarDashboard() {
-            definirFiltrosAtuais(); // Roda na hora que a página abre
+            definirFiltrosAtuais(); 
             
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
             if(data) dataMestreGlobal = data.data_mestre;
@@ -449,9 +455,8 @@
             document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
-       
+        
         iniciarDashboard();
-         
     </script>
 </body>
 </html>
