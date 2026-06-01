@@ -267,7 +267,6 @@
 
         // TRAVA DE SEGURANÇA (OWNER): O usuário só pode finalizar o que ele próprio puxou
         function abrirModalFinalizar() {
-            // Filtra as ondas em andamento verificando se é do usuario atual ou se é master
             let minhasOndas = agrupadosProcessando.filter(g => g.usuario_inicio === usuarioAtual.login || usuarioAtual.perfil === 'master');
             
             if(minhasOndas.length === 0) {
@@ -275,16 +274,25 @@
                 return;
             }
 
-            // Armazena as ondas permitidas globalmente para o botão "Avançar"
             window.ondasSendoFinalizadas = minhasOndas;
 
-            document.getElementById('listaDemandaFinalizar').innerHTML = minhasOndas.map((g,i) => `<label class="flex items-center justify-between p-3 border rounded bg-white cursor-pointer"><div class="flex gap-3"><input type="checkbox" id="chkFin_${i}" value="${i}" class="w-5 h-5" checked><span class="font-bold">${g.unidade}</span></div><span class="bg-slate-100 px-2 rounded">${g.qtd}</span></label>`).join('');
+            document.getElementById('listaDemandaFinalizar').innerHTML = minhasOndas.map((g,i) => {
+                let dt = g.data_malote.split('-').reverse().join('/');
+                return `
+                <label class="flex items-center justify-between p-3 border rounded bg-white cursor-pointer hover:bg-blue-50 transition">
+                    <div class="flex gap-3 items-center">
+                        <input type="checkbox" id="chkFin_${i}" value="${i}" class="w-5 h-5 text-blue-600 rounded" checked>
+                        <span class="font-bold text-slate-700">${g.unidade} <span class="text-xs font-normal text-slate-500 ml-1">(${dt})</span></span>
+                    </div>
+                    <span class="bg-slate-100 px-2 rounded text-xs font-bold text-slate-600">${g.qtd}</span>
+                </label>`;
+            }).join('');
+            
             document.getElementById('modalFinalizar').classList.remove('hidden');
         }
 
         async function processarSelecaoFinalizacao() {
             gruposParaFinalizar = []; let gruposDevolvidos = [];
-            // Verifica apenas em cima da lista que foi autorizada para o usuário
             window.ondasSendoFinalizadas.forEach((g, i) => document.getElementById(`chkFin_${i}`).checked ? gruposParaFinalizar.push(g) : gruposDevolvidos.push(g));
             
             if (gruposDevolvidos.length > 0 && confirm("Devolver itens desmarcados para fila?")) {
@@ -300,7 +308,6 @@
             await banco.from('malotes').update({ status: 'FINALIZADO', usuario_finalizacao: usuarioAtual.login }).in('id_unico', ids);
             fecharModal('modalPerguntaAusentes'); carregarDados();
         }
-
         let atendimentosAusentesMap = [];
         function abrirModalAusentes() {
             fecharModal('modalPerguntaAusentes'); atendimentosAusentesMap = [];
