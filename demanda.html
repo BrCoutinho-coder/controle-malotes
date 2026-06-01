@@ -97,7 +97,8 @@
 
     <div id="modalFinalizar" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded shadow-xl w-[500px] border-t-4 border-green-600 flex flex-col max-h-[80vh]">
-            <h2 class="text-xl font-bold text-slate-800 mb-2">Finalizar Demanda</h2>
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Finalizar Sua Demanda</h2>
+            <p class="text-xs text-slate-500 mb-4">Você está vendo apenas as demandas iniciadas por você.</p>
             <div class="overflow-y-auto custom-scroll mb-6 flex-1 border rounded p-2 bg-slate-50"><div id="listaDemandaFinalizar" class="space-y-2"></div></div>
             <div class="flex justify-end gap-2 shrink-0">
                 <button onclick="fecharModal('modalFinalizar')" class="px-4 py-2 bg-slate-200 rounded font-medium">Cancelar</button>
@@ -224,8 +225,13 @@
                 let o = ondas[k]; let d = new Date(k);
                 let hFormato = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
                 
+                // INDICADOR VISUAL: Marca visualmente se essa onda é da pessoa logada
+                let eMinhaOnda = (o.usu === usuarioAtual.login);
+                let tagVisual = eMinhaOnda ? `<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] ml-2 font-bold uppercase animate-pulse">Sua Fila</span>` : '';
+                let bordaOnda = eMinhaOnda ? 'border-blue-500 border-2' : 'border-slate-200 border';
+
                 let htm = o.itens.map(i => `<span class="bg-white border text-slate-700 text-xs font-bold px-2 py-1.5 rounded flex items-center gap-2">${i.unidade} <span class="bg-blue-100 text-blue-700 px-1.5 rounded">${i.qtd}</span></span>`).join('');
-                cont.innerHTML += `<div class="border rounded shadow-sm bg-white overflow-hidden animate-fade-in"><div class="bg-slate-200 p-2 px-4 flex justify-between items-center"><span class="text-sm font-bold text-slate-700">🌊 Iniciado às ${hFormato} por ${o.usu ? o.usu.toUpperCase() : 'SISTEMA'}</span><span class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">Carga: ${o.qtd}</span></div><div class="p-4 flex gap-2 flex-wrap bg-slate-50">${htm}</div></div>`;
+                cont.innerHTML += `<div class="${bordaOnda} rounded shadow-sm bg-white overflow-hidden animate-fade-in"><div class="bg-slate-200 p-2 px-4 flex justify-between items-center"><span class="text-sm font-bold text-slate-700">🌊 Iniciado às ${hFormato} por ${o.usu ? o.usu.toUpperCase() : 'SISTEMA'} ${tagVisual}</span><span class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">Carga: ${o.qtd}</span></div><div class="p-4 flex gap-2 flex-wrap bg-slate-50">${htm}</div></div>`;
             });
         }
 
@@ -259,14 +265,28 @@
             fecharModal('modalIniciar'); carregarDados();
         }
 
+        // TRAVA DE SEGURANÇA (OWNER): O usuário só pode finalizar o que ele próprio puxou
         function abrirModalFinalizar() {
-            document.getElementById('listaDemandaFinalizar').innerHTML = agrupadosProcessando.map((g,i) => `<label class="flex items-center justify-between p-3 border rounded bg-white cursor-pointer"><div class="flex gap-3"><input type="checkbox" id="chkFin_${i}" value="${i}" class="w-5 h-5" checked><span class="font-bold">${g.unidade}</span></div><span class="bg-slate-100 px-2 rounded">${g.qtd}</span></label>`).join('');
+            // Filtra as ondas em andamento verificando se é do usuario atual ou se é master
+            let minhasOndas = agrupadosProcessando.filter(g => g.usuario_inicio === usuarioAtual.login || usuarioAtual.perfil === 'master');
+            
+            if(minhasOndas.length === 0) {
+                alert("Você não possui demandas em processamento para finalizar no momento.");
+                return;
+            }
+
+            // Armazena as ondas permitidas globalmente para o botão "Avançar"
+            window.ondasSendoFinalizadas = minhasOndas;
+
+            document.getElementById('listaDemandaFinalizar').innerHTML = minhasOndas.map((g,i) => `<label class="flex items-center justify-between p-3 border rounded bg-white cursor-pointer"><div class="flex gap-3"><input type="checkbox" id="chkFin_${i}" value="${i}" class="w-5 h-5" checked><span class="font-bold">${g.unidade}</span></div><span class="bg-slate-100 px-2 rounded">${g.qtd}</span></label>`).join('');
             document.getElementById('modalFinalizar').classList.remove('hidden');
         }
 
         async function processarSelecaoFinalizacao() {
             gruposParaFinalizar = []; let gruposDevolvidos = [];
-            agrupadosProcessando.forEach((g, i) => document.getElementById(`chkFin_${i}`).checked ? gruposParaFinalizar.push(g) : gruposDevolvidos.push(g));
+            // Verifica apenas em cima da lista que foi autorizada para o usuário
+            window.ondasSendoFinalizadas.forEach((g, i) => document.getElementById(`chkFin_${i}`).checked ? gruposParaFinalizar.push(g) : gruposDevolvidos.push(g));
+            
             if (gruposDevolvidos.length > 0 && confirm("Devolver itens desmarcados para fila?")) {
                 let ids = []; gruposDevolvidos.forEach(g => ids.push(...g.ids));
                 await banco.from('malotes').update({ status: 'RECEBIDO', data_inicio: null, usuario_inicio: null }).in('id_unico', ids);
@@ -320,7 +340,6 @@
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        // CORREÇÃO: Função init devidamente construída e chamada
         async function init() { 
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
             if(data) dataMestreGlobal = data.data_mestre;
