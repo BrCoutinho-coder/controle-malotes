@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Demanda - Operação</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <div id="loginModal" class="fixed inset-0 bg-slate-900 z-[100] flex items-center justify-center transition-opacity">
+        <div class="bg-white p-8 rounded shadow-2xl w-96 flex flex-col">
+            <h2 class="text-2xl font-black text-[#1e3a8a] mb-2 text-center">Acesso Restrito</h2>
+            <p class="text-sm text-slate-500 mb-6 text-center">Identifique-se para acessar a fila.</p>
+            <input type="text" id="loginUser" placeholder="Usuário" class="border border-slate-300 p-3 rounded mb-4 outline-none">
+            <input type="password" id="loginPass" placeholder="Senha" class="border border-slate-300 p-3 rounded mb-6 outline-none" onkeypress="if(event.key === 'Enter') fazerLogin()">
+            <button onclick="fazerLogin()" class="bg-[#1e3a8a] hover:bg-blue-800 text-white font-bold py-3 rounded shadow">Entrar</button>
+        </div>
+    </div>
+
+    <header class="bg-[#1e3a8a] text-white p-4 shadow-md flex justify-between items-center shrink-0 z-10">
+        <h1 class="text-xl font-bold tracking-wide flex items-center gap-2">📊 Painel de Demanda</h1>
+        <div class="flex gap-3 items-center">
+            <button onclick="baixarRelatorio()" class="bg-slate-100 hover:bg-white text-[#1e3a8a] px-4 py-2 rounded text-sm font-bold shadow flex items-center gap-2 transition-transform hover:scale-105 active:scale-95">
+                📥 Baixar Relatório (30 Dias)
+            </button>
+            <button onclick="abrirModalAusentesEntregues()" class="bg-yellow-500 hover:bg-yellow-400 text-slate-900 px-4 py-2 rounded text-sm font-bold shadow border border-yellow-400 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2">
+                📦 Ausentes Entregues
+            </button>
+            <a href="index.html" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded text-sm font-bold shadow border border-slate-500 transition-transform hover:scale-105 active:scale-95 flex items-center gap-2">
+                🔙 Controle de Malotes
+            </a>
+            <button onclick="fazerLogout()" class="text-sm bg-red-600 hover:bg-red-500 px-3 py-2 rounded font-bold ml-2">Sair</button>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-6 flex flex-col gap-6 max-w-[1600px] mx-auto w-full custom-scroll">
+        <div class="flex justify-between items-center bg-white p-4 rounded shadow-sm border border-slate-200 shrink-0">
+            <h2 class="text-lg font-bold text-slate-700">Gestão de Fila</h2>
+            <div class="flex gap-3">
+                <button onclick="abrirModalIniciar()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded shadow transition-transform hover:scale-105 active:scale-95 text-sm font-bold">▶ Iniciar Demanda</button>
+                <button onclick="abrirModalFinalizar()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded shadow transition-transform hover:scale-105 active:scale-95 text-sm font-bold">✅ Finalizar Demanda</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 shrink-0">
+            <div class="lg:col-span-8 bg-white p-4 rounded shadow-sm border border-slate-200 flex flex-col">
+                <h3 class="text-md font-bold text-slate-700 mb-4 border-b pb-2">Prioridades (Mais Antigos)</h3>
+                <div id="containerQuadros" class="grid grid-cols-3 gap-3"></div>
+            </div>
+
+            <div class="lg:col-span-4 bg-white p-4 rounded shadow-sm border border-slate-200 flex flex-col h-64">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider">Volume a Fechar</h3>
+                    <span class="text-xs bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold" id="totalGuiasGrafico">0</span>
+                </div>
+                <div class="w-full h-full relative"><canvas id="chartGuias"></canvas></div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden min-h-[250px]">
+            <h3 class="text-md font-bold text-white bg-slate-800 p-3 m-0">⚙️ Em Processamento (Por Onda)</h3>
+            <div id="containerProcessamento" class="overflow-y-auto custom-scroll flex-1 p-4 flex flex-col gap-4 bg-slate-50"></div>
+        </div>
+    </main>
+
+    <div id="modalAusentesEntregue" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-[700px] border-t-4 border-yellow-500 flex flex-col max-h-[90vh]">
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Guias Ausentes Entregues</h2>
+            <input type="text" id="buscaRecuperaAusentes" placeholder="Pesquisar por Atendimento ou Unidade..." class="w-full border p-2 rounded mb-4 outline-none text-sm" onkeyup="filtrarRecuperaAusentes()">
+            <div class="overflow-y-auto custom-scroll mb-6 flex-1 border rounded bg-slate-50 p-2">
+                <table class="w-full text-sm text-left"><tbody id="listaRecuperaAusentesTabela" class="divide-y divide-slate-200"></tbody></table>
+            </div>
+            <div class="flex justify-end gap-2 shrink-0">
+                <button onclick="fecharModal('modalAusentesEntregue')" class="px-4 py-2 bg-slate-200 rounded font-medium">Cancelar</button>
+                <button onclick="confirmarAusentesEntregues()" class="px-6 py-2 bg-yellow-500 font-bold shadow">Confirmar Recebimento</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalIniciar" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-[500px] border-t-4 border-blue-600 flex flex-col max-h-[80vh]">
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Resumo da Demanda</h2>
+            <div class="overflow-y-auto custom-scroll mb-4 flex-1 bg-slate-50 p-2 border rounded"><ul id="listaDemandaIniciar" class="space-y-2"></ul></div>
+            <div class="flex justify-end gap-2 shrink-0">
+                <button onclick="fecharModal('modalIniciar')" class="px-4 py-2 bg-slate-200 rounded font-medium">Cancelar</button>
+                <button onclick="confirmarInicio()" class="px-6 py-2 bg-blue-600 text-white rounded font-bold">Iniciar Onda</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalFinalizar" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-[500px] border-t-4 border-green-600 flex flex-col max-h-[80vh]">
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Finalizar Demanda</h2>
+            <div class="overflow-y-auto custom-scroll mb-6 flex-1 border rounded p-2 bg-slate-50"><div id="listaDemandaFinalizar" class="space-y-2"></div></div>
+            <div class="flex justify-end gap-2 shrink-0">
+                <button onclick="fecharModal('modalFinalizar')" class="px-4 py-2 bg-slate-200 rounded font-medium">Cancelar</button>
+                <button onclick="processarSelecaoFinalizacao()" class="px-6 py-2 bg-green-600 text-white rounded font-bold">Avançar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalPerguntaAusentes" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-96 text-center border-t-4 border-yellow-500">
+            <h2 class="text-xl font-bold text-slate-800 mb-4">Houve guias ausentes?</h2>
+            <div class="flex justify-center gap-4">
+                <button onclick="confirmarFinalizacaoSemAusentes()" class="px-6 py-3 w-32 bg-slate-200 rounded font-bold">Não</button>
+                <button onclick="abrirModalAusentes()" class="px-6 py-3 w-32 bg-yellow-500 text-white rounded font-bold">Sim</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalAusentes" class="hidden fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+        <div class="bg-white p-6 rounded shadow-xl w-[700px] border-t-4 border-red-600 flex flex-col max-h-[90vh]">
+            <h2 class="text-xl font-bold text-slate-800 mb-2">Sinalizar Ausentes</h2>
+            <input type="text" id="buscaAusentes" placeholder="Pesquisar..." class="w-full border p-2 rounded mb-4" onkeyup="filtrarAusentes()">
+            <div class="overflow-y-auto custom-scroll mb-6 flex-1 border rounded bg-slate-50 p-2">
+                <table class="w-full text-sm text-left"><tbody id="listaAusentesTabela" class="divide-y divide-slate-200"></tbody></table>
+            </div>
+            <div class="flex justify-end gap-2 shrink-0">
+                <button onclick="confirmarFinalizacaoComAusentes()" class="px-6 py-2 bg-red-600 text-white rounded font-bold">Finalizar Tudo</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://gtmcjuwzmzsuifomcodt.supabase.co';
+        const supabaseKey = 'sb_publishable_eZ-8tGB15B6lgyHjybJtvA_u2WJsts8';
+        const banco = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let usuarioAtual = JSON.parse(sessionStorage.getItem('usuarioLogado'));
+
+        function verificarLogin() {
+            if (!usuarioAtual) document.getElementById('loginModal').classList.remove('hidden');
+            else { document.getElementById('loginModal').classList.add('hidden'); init(); }
+        }
+
+        async function fazerLogin() {
+            const user = document.getElementById('loginUser').value;
+            const pass = document.getElementById('loginPass').value;
+            const { data, error } = await banco.from('usuarios').select('*').eq('login', user).eq('senha', pass).single();
+            if (data) { usuarioAtual = data; sessionStorage.setItem('usuarioLogado', JSON.stringify(data)); verificarLogin(); } 
+            else { alert("Credenciais incorretas."); }
+        }
+
+        function fazerLogout() { sessionStorage.removeItem('usuarioLogado'); location.reload(); }
+
+        const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
+        let dadosGerais = []; let listaGlobalAusentes = []; let agrupadosDisponiveis = []; let agrupadosProcessando = [];
+        let chartGuiasInstancia = null; let demandaSelecionadaParaInicio = []; let gruposParaFinalizar = [];
+        let dataMestreGlobal = new Date().toISOString().split('T')[0];
+
+        // GERA A HORA EXATA DO COMPUTADOR (Correção do Fuso Horário)
+        function gerarDataLocalSQL() {
+            let d = new Date();
+            let offset = d.getTimezoneOffset() * 60000;
+            return (new Date(d.getTime() - offset)).toISOString().replace('T', ' ').split('.')[0];
+        }
+
+        function calcularPrazo(dataInicialStr) {
+            let strLimpa = dataInicialStr.includes('T') ? dataInicialStr.split('T')[0] : dataInicialStr;
+            let data = new Date(strLimpa + "T12:00:00"); 
+            let diasAdicionados = 0;
+            while (diasAdicionados < 5) {
+                data.setDate(data.getDate() + 1);
+                if (data.getDay() !== 0 && data.getDay() !== 6 && !feriados2026.includes(data.toISOString().split('T')[0])) diasAdicionados++;
+            }
+            return data;
+        }
+
+        async function carregarDados() {
+            const { data } = await banco.from('malotes').select('*').in('status', ['RECEBIDO', 'PROCESSANDO', 'AUSENTE']);
+            if (data) {
+                dadosGerais = data.filter(d => d.status !== 'AUSENTE');
+                listaGlobalAusentes = data.filter(d => d.status === 'AUSENTE');
+                processarAgrupamentos(); renderizarQuadros(); renderizarOndasProcessamento(); atualizarGraficos();
+            }
+        }
+
+        function processarAgrupamentos() {
+            let mapDisp = {}; let mapProc = {};
+            dadosGerais.forEach(l => {
+                let m = l.status === 'RECEBIDO' ? mapDisp : mapProc;
+                let k = `${l.unidade}|${l.data_malote}`;
+                if (!m[k]) m[k] = { unidade: l.unidade, data_malote: l.data_malote, data_inicio: l.data_inicio, usuario_inicio: l.usuario_inicio, qtd: 0, ids: [] };
+                m[k].qtd++; m[k].ids.push(l.id_unico);
+            });
+            agrupadosDisponiveis = Object.values(mapDisp).sort((a,b) => new Date(a.data_malote) - new Date(b.data_malote));
+            agrupadosProcessando = Object.values(mapProc).sort((a,b) => new Date(b.data_inicio) - new Date(a.data_inicio));
+        }
+
+        function renderizarQuadros() {
+            const cont = document.getElementById('containerQuadros'); cont.innerHTML = '';
+            let top9 = agrupadosDisponiveis.slice(0, 9); // Aumentado para preencher a tela expandida
+            if(top9.length === 0) return cont.innerHTML = '<p class="text-slate-500">Vazio.</p>';
+
+            let hoje = new Date(); let inicioOperacao = new Date(dataMestreGlobal + "T12:00:00");
+            top9.forEach(g => {
+                let isAtrasado = (new Date(g.data_malote+"T12:00:00") >= inicioOperacao) && (hoje > (function(){let d=calcularPrazo(g.data_malote); d.setHours(23,59,59); return d;})());
+                let corF = isAtrasado ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-blue-500';
+                let txtC = isAtrasado ? 'text-red-600' : 'text-blue-600';
+                cont.innerHTML += `<div class="${corF} border-l-4 p-3 rounded shadow-sm flex flex-col justify-between">
+                    <span class="text-[10px] font-bold text-slate-500 tracking-wider">${g.data_malote.split('-').reverse().join('/')} ${isAtrasado?'<span class="text-red-600">● Atraso</span>':''}</span>
+                    <span class="text-sm font-black text-slate-800">${g.unidade}</span>
+                    <span class="text-xs font-bold ${txtC} mt-2 text-right">${g.qtd} Guias</span></div>`;
+            });
+        }
+
+        function renderizarOndasProcessamento() {
+            const cont = document.getElementById('containerProcessamento'); cont.innerHTML = '';
+            if(agrupadosProcessando.length === 0) return cont.innerHTML = '<div class="text-slate-400 p-6">Nada rodando.</div>';
+
+            let ondas = {};
+            agrupadosProcessando.forEach(g => {
+                if(!ondas[g.data_inicio]) ondas[g.data_inicio] = { itens: [], qtd: 0, usu: g.usuario_inicio };
+                ondas[g.data_inicio].itens.push(g); ondas[g.data_inicio].qtd += g.qtd;
+            });
+
+            Object.keys(ondas).sort((a,b) => new Date(b) - new Date(a)).forEach(k => {
+                let o = ondas[k]; let d = new Date(k);
+                let hFormato = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                
+                let htm = o.itens.map(i => `<span class="bg-white border text-slate-700 text-xs font-bold px-2 py-1.5 rounded flex items-center gap-2">${i.unidade} <span class="bg-blue-100 text-blue-700 px-1.5 rounded">${i.qtd}</span></span>`).join('');
+                cont.innerHTML += `<div class="border rounded shadow-sm bg-white overflow-hidden animate-fade-in"><div class="bg-slate-200 p-2 px-4 flex justify-between items-center"><span class="text-sm font-bold text-slate-700">🌊 Iniciado às ${hFormato} por ${o.usu.toUpperCase()}</span><span class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">Carga: ${o.qtd}</span></div><div class="p-4 flex gap-2 flex-wrap bg-slate-50">${htm}</div></div>`;
+            });
+        }
+
+        function atualizarGraficos() {
+            if(chartGuiasInstancia) chartGuiasInstancia.destroy();
+            let agg = {}; let total = 0;
+            agrupadosDisponiveis.forEach(g => { if(!agg[g.unidade]) agg[g.unidade]=0; agg[g.unidade]+=g.qtd; total+=g.qtd; });
+            document.getElementById('totalGuiasGrafico').innerText = total;
+
+            const labels = Object.keys(agg).sort((a,b) => agg[b] - agg[a]);
+            const dados = labels.map(l => agg[l]);
+
+            chartGuiasInstancia = new Chart(document.getElementById('chartGuias').getContext('2d'), {
+                type: 'bar', data: { labels: labels, datasets: [{ data: dados, backgroundColor: '#3b82f6', borderRadius: 4 }] },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { grid: { display: false }, ticks: { font: { size: 10, weight: 'bold' } } } } }
+            });
+        }
+
+        function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        function abrirModalIniciar() {
+            demandaSelecionadaParaInicio = []; let soma = 0;
+            for (let g of agrupadosDisponiveis) { demandaSelecionadaParaInicio.push(g); soma += g.qtd; if (soma >= 380) break; }
+            document.getElementById('listaDemandaIniciar').innerHTML = demandaSelecionadaParaInicio.map(g => `<li class="flex justify-between items-center bg-white p-2 border rounded"><span class="font-bold text-sm">${g.unidade}</span><span class="bg-blue-100 text-xs font-bold px-2 py-1 rounded">${g.qtd}</span></li>`).join('');
+            document.getElementById('modalIniciar').classList.remove('hidden');
+        }
+
+        async function confirmarInicio() {
+            let ids = []; demandaSelecionadaParaInicio.forEach(g => ids.push(...g.ids));
+            await banco.from('malotes').update({ status: 'PROCESSANDO', data_inicio: gerarDataLocalSQL(), usuario_inicio: usuarioAtual.login }).in('id_unico', ids);
+            fecharModal('modalIniciar'); carregarDados();
+        }
+
+        function abrirModalFinalizar() {
+            document.getElementById('listaDemandaFinalizar').innerHTML = agrupadosProcessando.map((g,i) => `<label class="flex items-center justify-between p-3 border rounded bg-white cursor-pointer"><div class="flex gap-3"><input type="checkbox" id="chkFin_${i}" value="${i}" class="w-5 h-5" checked><span class="font-bold">${g.unidade}</span></div><span class="bg-slate-100 px-2 rounded">${g.qtd}</span></label>`).join('');
+            document.getElementById('modalFinalizar').classList.remove('hidden');
+        }
+
+        async function processarSelecaoFinalizacao() {
+            gruposParaFinalizar = []; let gruposDevolvidos = [];
+            agrupadosProcessando.forEach((g, i) => document.getElementById(`chkFin_${i}`).checked ? gruposParaFinalizar.push(g) : gruposDevolvidos.push(g));
+            if (gruposDevolvidos.length > 0 && confirm("Devolver itens desmarcados para fila?")) {
+                let ids = []; gruposDevolvidos.forEach(g => ids.push(...g.ids));
+                await banco.from('malotes').update({ status: 'RECEBIDO', data_inicio: null, usuario_inicio: null }).in('id_unico', ids);
+            }
+            fecharModal('modalFinalizar');
+            gruposParaFinalizar.length > 0 ? document.getElementById('modalPerguntaAusentes').classList.remove('hidden') : carregarDados();
+        }
+
+        async function confirmarFinalizacaoSemAusentes() {
+            let ids = []; gruposParaFinalizar.forEach(g => ids.push(...g.ids));
+            await banco.from('malotes').update({ status: 'FINALIZADO', usuario_finalizacao: usuarioAtual.login }).in('id_unico', ids);
+            fecharModal('modalPerguntaAusentes'); carregarDados();
+        }
+
+        let atendimentosAusentesMap = [];
+        function abrirModalAusentes() {
+            fecharModal('modalPerguntaAusentes'); atendimentosAusentesMap = [];
+            gruposParaFinalizar.forEach(g => g.ids.forEach(id => atendimentosAusentesMap.push({ id_unico: id, unidade: g.unidade, atendimento: id.split('-').slice(1).join('-') })));
+            document.getElementById('listaAusentesTabela').innerHTML = atendimentosAusentesMap.map(i => `<tr class="tr-ausente"><td class="p-2"><input type="checkbox" value="${i.id_unico}" class="chk-ausente"></td><td class="p-2 font-bold">${i.unidade}</td><td class="p-2">${i.atendimento}</td></tr>`).join('');
+            document.getElementById('modalAusentes').classList.remove('hidden');
+        }
+
+        async function confirmarFinalizacaoComAusentes() {
+            let idsAus = []; document.querySelectorAll('.chk-ausente:checked').forEach(c => idsAus.push(c.value));
+            let idsFin = atendimentosAusentesMap.map(i => i.id_unico).filter(id => !idsAusentes.includes(id));
+            if(idsFin.length > 0) await banco.from('malotes').update({ status: 'FINALIZADO', usuario_finalizacao: usuarioAtual.login }).in('id_unico', idsFin);
+            if(idsAus.length > 0) await banco.from('malotes').update({ status: 'AUSENTE', usuario_finalizacao: usuarioAtual.login }).in('id_unico', idsAus);
+            fecharModal('modalAusentes'); carregarDados();
+        }
+
+        function abrirModalAusentesEntregues() {
+            document.getElementById('listaRecuperaAusentesTabela').innerHTML = listaGlobalAusentes.map(i => `<tr class="tr-rec-ausente border-b"><td class="p-2"><input type="checkbox" value="${i.id_unico}" class="chk-rec-ausente"></td><td class="p-2 font-bold">${i.unidade}</td><td class="p-2">${i.atendimento}</td><td class="p-2">${i.data_malote.split('-').reverse().join('/')}</td></tr>`).join('');
+            document.getElementById('modalAusentesEntregue').classList.remove('hidden');
+        }
+
+        async function confirmarAusentesEntregues() {
+            let ids = []; document.querySelectorAll('.chk-rec-ausente:checked').forEach(c => ids.push(c.value));
+            if(ids.length > 0) await banco.from('malotes').update({ status: 'RECEBIDO', data_inicio: null, usuario_inicio: null, usuario_finalizacao: null }).in('id_unico', ids);
+            fecharModal('modalAusentesEntregue'); carregarDados();
+        }
+
+        // ==========================================
+        // DOWNLOAD DO RELATÓRIO DE GESTÃO (30 DIAS)
+        // ==========================================
+        async function baixarRelatorio() {
+            const dataFiltro = new Date(); dataFiltro.setDate(dataFiltro.getDate() - 30);
+            const { data } = await banco.from('malotes').select('*').gte('data_malote', dataFiltro.toISOString().split('T')[0]);
+            
+            if(!data || data.length === 0) return alert("Sem dados.");
+            
+            let csvContent = "data:text/csv;charset=utf-8,ID;Unidade;Atendimento;Data Malote;Status;Resp Checkin;Data Inicio;Resp Inicio;Resp Finalizacao\n";
+            data.forEach(r => {
+                csvContent += `${r.id_unico};${r.unidade};${r.atendimento};${r.data_malote};${r.status};${r.usuario_checkin||'-'};${r.data_inicio||'-'};${r.usuario_inicio||'-'};${r.usuario_finalizacao||'-'}\n`;
+            });
+            
+            const encodeUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodeUri); link.setAttribute("download", `Relatorio_Operacao_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+        }
+
+        async function init() { await buscarConfiguracaoGlobal(); await carregarDados(); }
+        let dtimer; banco.channel('canal-demandas').on('postgres_changes', { event:'*', schema:'public', table:'malotes' }, p => { clearTimeout(dtimer); dtimer = setTimeout(()=>carregarDados(), 500); }).subscribe();
+        
+        verificarLogin();
+    </script>
+</body>
+</html>
