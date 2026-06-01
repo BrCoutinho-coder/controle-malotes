@@ -144,7 +144,7 @@
         async function fazerLogin() {
             const user = document.getElementById('loginUser').value;
             const pass = document.getElementById('loginPass').value;
-            const { data, error } = await banco.from('usuarios').select('*').eq('login', user).eq('senha', pass).single();
+            const { data } = await banco.from('usuarios').select('*').eq('login', user).eq('senha', pass).single();
             if (data) { usuarioAtual = data; sessionStorage.setItem('usuarioLogado', JSON.stringify(data)); verificarLogin(); } 
             else { alert("Credenciais incorretas."); }
         }
@@ -156,10 +156,8 @@
         let chartGuiasInstancia = null; let demandaSelecionadaParaInicio = []; let gruposParaFinalizar = [];
         let dataMestreGlobal = new Date().toISOString().split('T')[0];
 
-        // GERA A HORA EXATA DO COMPUTADOR (Correção do Fuso Horário)
         function gerarDataLocalSQL() {
-            let d = new Date();
-            let offset = d.getTimezoneOffset() * 60000;
+            let d = new Date(); let offset = d.getTimezoneOffset() * 60000;
             return (new Date(d.getTime() - offset)).toISOString().replace('T', ' ').split('.')[0];
         }
 
@@ -197,7 +195,7 @@
 
         function renderizarQuadros() {
             const cont = document.getElementById('containerQuadros'); cont.innerHTML = '';
-            let top9 = agrupadosDisponiveis.slice(0, 9); // Aumentado para preencher a tela expandida
+            let top9 = agrupadosDisponiveis.slice(0, 9); 
             if(top9.length === 0) return cont.innerHTML = '<p class="text-slate-500">Vazio.</p>';
 
             let hoje = new Date(); let inicioOperacao = new Date(dataMestreGlobal + "T12:00:00");
@@ -227,7 +225,7 @@
                 let hFormato = d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
                 
                 let htm = o.itens.map(i => `<span class="bg-white border text-slate-700 text-xs font-bold px-2 py-1.5 rounded flex items-center gap-2">${i.unidade} <span class="bg-blue-100 text-blue-700 px-1.5 rounded">${i.qtd}</span></span>`).join('');
-                cont.innerHTML += `<div class="border rounded shadow-sm bg-white overflow-hidden animate-fade-in"><div class="bg-slate-200 p-2 px-4 flex justify-between items-center"><span class="text-sm font-bold text-slate-700">🌊 Iniciado às ${hFormato} por ${o.usu.toUpperCase()}</span><span class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">Carga: ${o.qtd}</span></div><div class="p-4 flex gap-2 flex-wrap bg-slate-50">${htm}</div></div>`;
+                cont.innerHTML += `<div class="border rounded shadow-sm bg-white overflow-hidden animate-fade-in"><div class="bg-slate-200 p-2 px-4 flex justify-between items-center"><span class="text-sm font-bold text-slate-700">🌊 Iniciado às ${hFormato} por ${o.usu ? o.usu.toUpperCase() : 'SISTEMA'}</span><span class="bg-slate-700 text-white text-xs font-bold px-2 py-1 rounded">Carga: ${o.qtd}</span></div><div class="p-4 flex gap-2 flex-wrap bg-slate-50">${htm}</div></div>`;
             });
         }
 
@@ -293,7 +291,7 @@
 
         async function confirmarFinalizacaoComAusentes() {
             let idsAus = []; document.querySelectorAll('.chk-ausente:checked').forEach(c => idsAus.push(c.value));
-            let idsFin = atendimentosAusentesMap.map(i => i.id_unico).filter(id => !idsAusentes.includes(id));
+            let idsFin = atendimentosAusentesMap.map(i => i.id_unico).filter(id => !idsAus.includes(id));
             if(idsFin.length > 0) await banco.from('malotes').update({ status: 'FINALIZADO', usuario_finalizacao: usuarioAtual.login }).in('id_unico', idsFin);
             if(idsAus.length > 0) await banco.from('malotes').update({ status: 'AUSENTE', usuario_finalizacao: usuarioAtual.login }).in('id_unico', idsAus);
             fecharModal('modalAusentes'); carregarDados();
@@ -310,27 +308,25 @@
             fecharModal('modalAusentesEntregue'); carregarDados();
         }
 
-        // ==========================================
-        // DOWNLOAD DO RELATÓRIO DE GESTÃO (30 DIAS)
-        // ==========================================
         async function baixarRelatorio() {
             const dataFiltro = new Date(); dataFiltro.setDate(dataFiltro.getDate() - 30);
             const { data } = await banco.from('malotes').select('*').gte('data_malote', dataFiltro.toISOString().split('T')[0]);
-            
             if(!data || data.length === 0) return alert("Sem dados.");
             
             let csvContent = "data:text/csv;charset=utf-8,ID;Unidade;Atendimento;Data Malote;Status;Resp Checkin;Data Inicio;Resp Inicio;Resp Finalizacao\n";
-            data.forEach(r => {
-                csvContent += `${r.id_unico};${r.unidade};${r.atendimento};${r.data_malote};${r.status};${r.usuario_checkin||'-'};${r.data_inicio||'-'};${r.usuario_inicio||'-'};${r.usuario_finalizacao||'-'}\n`;
-            });
+            data.forEach(r => { csvContent += `${r.id_unico};${r.unidade};${r.atendimento};${r.data_malote};${r.status};${r.usuario_checkin||'-'};${r.data_inicio||'-'};${r.usuario_inicio||'-'};${r.usuario_finalizacao||'-'}\n`; });
             
-            const encodeUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodeUri); link.setAttribute("download", `Relatorio_Operacao_${new Date().toISOString().split('T')[0]}.csv`);
+            const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Relatorio_Operacao_${new Date().toISOString().split('T')[0]}.csv`);
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
         }
 
-        async function init() { await buscarConfiguracaoGlobal(); await carregarDados(); }
+        // CORREÇÃO: Função init devidamente construída e chamada
+        async function init() { 
+            const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
+            if(data) dataMestreGlobal = data.data_mestre;
+            await carregarDados(); 
+        }
+        
         let dtimer; banco.channel('canal-demandas').on('postgres_changes', { event:'*', schema:'public', table:'malotes' }, p => { clearTimeout(dtimer); dtimer = setTimeout(()=>carregarDados(), 500); }).subscribe();
         
         verificarLogin();
