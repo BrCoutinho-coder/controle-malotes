@@ -327,9 +327,9 @@
                         let dataPrazo = calcularPrazo(dataCelulaStr);
                         dataPrazo.setHours(23, 59, 59, 999);
                         if (hoje > dataPrazo) {
-                            celula.innerHTML = `<div class="w-full h-full bg-red-500 rounded shadow-sm opacity-85 cursor-not-allowed border border-red-600"></div>`;
+                            celula.innerHTML = `<div class="w-full h-full bg-red-500 rounded shadow-sm opacity-85 cursor-not-allowed border border-red-600" title="Atrasado (Prazo era: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
                         } else {
-                            celula.innerHTML = `<div class="w-full h-full bg-slate-50 border border-slate-100 rounded opacity-60"></div>`;
+                            celula.innerHTML = `<div class="w-full h-full bg-slate-50 border border-slate-100 rounded opacity-60" title="Aguardando (No prazo até: ${dataPrazo.toLocaleDateString('pt-BR')})"></div>`;
                         }
                     } else { celula.innerHTML = ''; }
                 }
