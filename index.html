@@ -49,8 +49,7 @@
 
             <div>
                 <h2 class="text-lg font-bold text-slate-800 mb-2 border-b pb-1">Gerenciar Equipe</h2>
-                <div id="listaUsuarios" class="flex flex-col gap-2 mb-4 max-h-32 overflow-y-auto border p-2 rounded bg-slate-50 custom-scroll">
-                    </div>
+                <div id="listaUsuarios" class="flex flex-col gap-2 mb-4 max-h-32 overflow-y-auto border p-2 rounded bg-slate-50 custom-scroll"></div>
                 <input type="text" id="novoLogin" placeholder="Login do Funcionário" class="w-full border border-slate-300 p-2 rounded mb-2 text-slate-700">
                 <input type="text" id="novaSenha" placeholder="Senha" class="w-full border border-slate-300 p-2 rounded mb-2 text-slate-700">
                 <button onclick="criarUsuario()" class="w-full py-2 bg-green-600 text-white rounded font-bold">Cadastrar Usuário</button>
@@ -67,11 +66,11 @@
             <h2 class="text-lg font-bold text-slate-800 mb-4">Check-in de Malote</h2>
             <label class="block text-sm font-medium text-slate-600 mb-1">Data REAL do Recebimento:</label>
             <input type="date" id="dataRecebimento" class="w-full border border-slate-300 p-2 rounded mb-4 text-slate-700">
-            <label class="block text-sm font-medium text-slate-600 mb-1">Arquivo CSV do Sistema:</label>
-            <input type="file" id="csvFileInput" accept=".csv" class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700">
+            <label class="block text-sm font-medium text-slate-600 mb-1">Arquivos CSV (Pode selecionar vários):</label>
+            <input type="file" id="csvFileInput" accept=".csv" multiple class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700">
             <div class="flex justify-end gap-2">
                 <button onclick="fecharModal('checkinModal')" class="px-4 py-2 bg-slate-200 text-slate-700 rounded font-medium">Cancelar</button>
-                <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Validar CSV</button>
+                <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Validar CSV(s)</button>
             </div>
         </div>
     </div>
@@ -112,13 +111,9 @@
 
         let usuarioAtual = JSON.parse(sessionStorage.getItem('usuarioLogado'));
 
-        // ==========================================
-        // SISTEMA DE LOGIN E GESTÃO
-        // ==========================================
         function verificarLogin() {
-            if (!usuarioAtual) {
-                document.getElementById('loginModal').classList.remove('hidden');
-            } else {
+            if (!usuarioAtual) { document.getElementById('loginModal').classList.remove('hidden'); } 
+            else {
                 document.getElementById('loginModal').classList.add('hidden');
                 if (usuarioAtual.perfil === 'master') { document.getElementById('btnConfig').classList.remove('hidden'); }
                 iniciarDashboard();
@@ -129,17 +124,13 @@
             const user = document.getElementById('loginUser').value;
             const pass = document.getElementById('loginPass').value;
             const { data } = await banco.from('usuarios').select('*').eq('login', user).eq('senha', pass).single();
-            if (data) {
-                usuarioAtual = data; sessionStorage.setItem('usuarioLogado', JSON.stringify(data)); verificarLogin();
-            } else { alert("Credenciais incorretas."); }
+            if (data) { usuarioAtual = data; sessionStorage.setItem('usuarioLogado', JSON.stringify(data)); verificarLogin(); } 
+            else { alert("Credenciais incorretas."); }
         }
 
         function fazerLogout() { sessionStorage.removeItem('usuarioLogado'); location.reload(); }
 
-        async function abrirModalConfig() {
-            document.getElementById('configModal').classList.remove('hidden');
-            carregarUsuariosEquipe();
-        }
+        async function abrirModalConfig() { document.getElementById('configModal').classList.remove('hidden'); carregarUsuariosEquipe(); }
 
         async function carregarUsuariosEquipe() {
             const { data } = await banco.from('usuarios').select('*').neq('perfil', 'master');
@@ -150,137 +141,117 @@
                         <span class="font-bold text-sm text-slate-700">${u.login}</span>
                         <button onclick="excluirUsuario('${u.login}')" class="text-red-500 hover:text-red-700 font-bold text-xs bg-red-50 px-2 py-1 rounded">Excluir</button>
                     </div>`).join('');
-            } else {
-                div.innerHTML = '<span class="text-xs text-slate-500 italic p-2">Nenhum usuário cadastrado.</span>';
-            }
+            } else { div.innerHTML = '<span class="text-xs text-slate-500 italic p-2">Nenhum usuário.</span>'; }
         }
 
         async function excluirUsuario(loginParaExcluir) {
             if(confirm(`Tem certeza que deseja excluir o usuário: ${loginParaExcluir}?`)) {
-                await banco.from('usuarios').delete().eq('login', loginParaExcluir);
-                carregarUsuariosEquipe();
+                await banco.from('usuarios').delete().eq('login', loginParaExcluir); carregarUsuariosEquipe();
             }
         }
 
         async function criarUsuario() {
-            const log = document.getElementById('novoLogin').value;
-            const sen = document.getElementById('novaSenha').value;
+            const log = document.getElementById('novoLogin').value; const sen = document.getElementById('novaSenha').value;
             if(!log || !sen) return;
             const { error } = await banco.from('usuarios').insert([{ login: log, senha: sen, perfil: 'equipe' }]);
-            if(!error) { 
-                document.getElementById('novoLogin').value=''; document.getElementById('novaSenha').value=''; 
-                carregarUsuariosEquipe();
-            } else { alert('Erro ao criar usuário.'); }
+            if(!error) { document.getElementById('novoLogin').value=''; document.getElementById('novaSenha').value=''; carregarUsuariosEquipe(); } 
+            else { alert('Erro ao criar usuário.'); }
         }
 
         const mapaUnidades = { "MOEMA EXPRESS": "MOEMA", "OSASCO EXPANSÃO": "OSASCO", "TATUAPE (ALA LILÁS)": "TATUAPE", "ROTINAS EXTERNAS": "EXTERNOS", "PROJETO PAPA BRASIL": "EXTERNOS", "SANTO AMARO NTO": "EXTERNOS", "LABORATÓRIO IMD (GRUPO IGESP / TRANSMONTANO)": "EXTERNOS", "OSASCO - NTO": "EXTERNOS", "COLETA EMPRESAS": "COLETA DOMICILIAR" };
         const unidadesFinais = [ "PARAISO", "PARAISO PREFERENCE", "PARAISO EXPRESS", "MOEMA", "OSASCO", "PERDIZES", "SANTANA", "SANTO AMARO", "MORUMBI", "TATUAPE", "PAULISTA", "VILA OLIMPIA", "EXTERNOS", "COLETA DOMICILIAR" ];
         const feriados2026 = ['2026-01-01', '2026-02-16', '2026-02-17', '2026-04-03', '2026-04-21', '2026-05-01', '2026-06-04', '2026-09-07', '2026-10-12', '2026-11-02', '2026-11-15', '2026-12-25'];
         
-        let dadosLocais = [];
-        let dataMestreGlobal = new Date().toISOString().split('T')[0];
+        let dadosLocais = []; let dataMestreGlobal = new Date().toISOString().split('T')[0];
 
         function fecharModal(id) { document.getElementById(id).classList.add('hidden'); }
         async function salvarConfig() {
-            const novaData = document.getElementById('dataConfig').value;
-            await banco.from('configuracoes').update({ data_mestre: novaData }).eq('id', 1);
-            fecharModal('configModal');
+            await banco.from('configuracoes').update({ data_mestre: document.getElementById('dataConfig').value }).eq('id', 1); fecharModal('configModal');
         }
 
         function abrirModalCheckin() {
             document.getElementById('dataRecebimento').value = new Date().toISOString().split('T')[0];
-            document.getElementById('csvFileInput').value = "";
-            document.getElementById('checkinModal').classList.remove('hidden');
+            document.getElementById('csvFileInput').value = ""; document.getElementById('checkinModal').classList.remove('hidden');
         }
 
-        function destacarLinha(elementoClicado) {
-            document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada'));
-            elementoClicado.classList.add('linha-destacada');
-        }
-
+        function destacarLinha(elementoClicado) { document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada')); elementoClicado.classList.add('linha-destacada'); }
         function obterDiasDoMes(ano, mes) { return new Date(ano, mes, 0).getDate(); }
 
         function construirMatriz() {
-            const ano = document.getElementById('filtroAno').value;
-            const mes = document.getElementById('filtroMes').value;
-            const parte = document.getElementById('filtroParte').value;
-            
-            const totalDias = obterDiasDoMes(ano, mes);
-            const diaInicio = parte === "1" ? 1 : 16;
-            const diaFim = parte === "1" ? 15 : totalDias;
+            const ano = document.getElementById('filtroAno').value; const mes = document.getElementById('filtroMes').value; const parte = document.getElementById('filtroParte').value;
+            const totalDias = obterDiasDoMes(ano, mes); const diaInicio = parte === "1" ? 1 : 16; const diaFim = parte === "1" ? 15 : totalDias;
 
-            const thead = document.getElementById('matrizHead');
-            const tbody = document.getElementById('matrizBody');
+            const thead = document.getElementById('matrizHead'); const tbody = document.getElementById('matrizBody');
             
             let thHTML = `<tr><th class="px-4 py-3 text-left w-48 bg-slate-200 border-r-2 border-slate-300 sticky left-0 z-30 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] text-slate-700">Unidade</th>`;
             for (let d = diaInicio; d <= diaFim; d++) thHTML += `<th class="px-2 py-3 border-r border-slate-200 w-16">${d.toString().padStart(2, '0')}</th>`;
-            thHTML += `</tr>`;
-            thead.innerHTML = thHTML;
+            thHTML += `</tr>`; thead.innerHTML = thHTML;
 
             let tbHTML = '';
             unidadesFinais.forEach(unidade => {
-                tbHTML += `<tr class="hover:bg-blue-50 transition duration-150 cursor-pointer group" onclick="destacarLinha(this)">
-                            <td class="px-4 py-3 font-semibold text-slate-700 text-left border-r-2 border-slate-300 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:text-blue-700 z-20">${unidade}</td>`;
+                tbHTML += `<tr class="hover:bg-blue-50 transition duration-150 cursor-pointer group" onclick="destacarLinha(this)"><td class="px-4 py-3 font-semibold text-slate-700 text-left border-r-2 border-slate-300 sticky left-0 bg-white shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] group-hover:text-blue-700 z-20">${unidade}</td>`;
                 for (let d = diaInicio; d <= diaFim; d++) { tbHTML += `<td id="cel-${unidade.replace(/\s+/g, '')}-${d}" class="border-r border-slate-200 w-16 h-12 relative p-1"></td>`; }
                 tbHTML += `</tr>`;
             });
-            tbody.innerHTML = tbHTML;
-            preencherMatrizComDados();
+            tbody.innerHTML = tbHTML; preencherMatrizComDados();
         }
 
-        document.getElementById('filtroAno').addEventListener('change', carregarDadosSupabase);
-        document.getElementById('filtroMes').addEventListener('change', carregarDadosSupabase);
-        document.getElementById('filtroParte').addEventListener('change', construirMatriz);
+        document.getElementById('filtroAno').addEventListener('change', carregarDadosSupabase); document.getElementById('filtroMes').addEventListener('change', carregarDadosSupabase); document.getElementById('filtroParte').addEventListener('change', construirMatriz);
 
         function normalizarUnidade(nome) { return mapaUnidades[nome.trim().toUpperCase()] || nome.trim().toUpperCase(); }
 
         function calcularPrazo(dataInicialStr) {
             let strLimpa = dataInicialStr.includes('T') ? dataInicialStr.split('T')[0] : dataInicialStr;
-            let data = new Date(strLimpa + "T12:00:00"); 
-            let diasAdicionados = 0;
+            let data = new Date(strLimpa + "T12:00:00"); let diasAdicionados = 0;
             while (diasAdicionados < 5) {
                 data.setDate(data.getDate() + 1);
-                let diaSemana = data.getDay();
-                let dataFormatada = data.toISOString().split('T')[0];
-                if (diaSemana !== 0 && diaSemana !== 6 && !feriados2026.includes(dataFormatada)) { diasAdicionados++; }
+                if (data.getDay() !== 0 && data.getDay() !== 6 && !feriados2026.includes(data.toISOString().split('T')[0])) { diasAdicionados++; }
             }
             return data;
         }
 
-        function processarCheckin() {
+        // LEITURA EM LOTE DE ARQUIVOS MÚLTIPLOS (Soma Dinâmica)
+        async function processarCheckin() {
             const fileInput = document.getElementById('csvFileInput');
-            const file = fileInput.files[0];
+            const files = fileInput.files;
             const dataRecebimentoReal = document.getElementById('dataRecebimento').value;
 
-            if(!file) { alert("Anexe o arquivo."); return; }
-            const reader = new FileReader();
-            reader.readAsText(file, 'UTF-16LE'); 
-            
-            reader.onload = async function(e) {
-                const text = e.target.result.replace(/\0/g, '');
+            if(files.length === 0) { alert("Anexe pelo menos um arquivo CSV."); return; }
+            if(!dataRecebimentoReal) { alert("Escolha a data do recebimento."); return; }
+
+            let registrosValidos = [];
+            let setAtendimentos = new Set();
+            let unidadesAviso = new Set();
+            let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
+
+            for (let i = 0; i < files.length; i++) {
+                let file = files[i];
+                let text = await new Promise((resolve) => {
+                    let reader = new FileReader();
+                    reader.readAsText(file, 'UTF-16LE');
+                    reader.onload = (e) => resolve(e.target.result.replace(/\0/g, ''));
+                });
+
                 const linhas = text.split(/\r?\n/);
-                if (linhas.length < 2) return;
+                if (linhas.length < 2) continue;
 
                 let idxUnidade = -1; let idxAtendimento = -1; let idxDataMalote = -1; let linhaDadosInicio = 1;
-                for(let i = 0; i < Math.min(5, linhas.length); i++) {
-                    let colunas = linhas[i].split(';'); 
+                for(let j = 0; j < Math.min(5, linhas.length); j++) {
+                    let colunas = linhas[j].split(';'); 
                     for(let c = 0; c < colunas.length; c++) {
                         let celulaLimpa = colunas[c].toLowerCase().replace(/[^a-z0-9]/g, '');
                         if(celulaLimpa === 'unidade') idxUnidade = c;
                         if(celulaLimpa === 'atendimento') idxAtendimento = c;
                         if(celulaLimpa === 'dataatendimento' || celulaLimpa === 'data') idxDataMalote = c;
                     }
-                    if(idxUnidade !== -1 && idxAtendimento !== -1) { linhaDadosInicio = i + 1; break; }
+                    if(idxUnidade !== -1 && idxAtendimento !== -1) { linhaDadosInicio = j + 1; break; }
                 }
 
-                let registrosValidos = [];
-                let setAtendimentos = new Set();
-                let unidadeAviso = ""; let dataAviso = "";
-                let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
+                if(idxUnidade === -1 || idxAtendimento === -1) continue;
 
-                for(let i = linhaDadosInicio; i < linhas.length; i++) {
-                    if(!linhas[i].trim()) continue; 
-                    let colunas = linhas[i].split(';');
+                for(let j = linhaDadosInicio; j < linhas.length; j++) {
+                    if(!linhas[j].trim()) continue; 
+                    let colunas = linhas[j].split(';');
                     if(colunas.length <= Math.max(idxUnidade, idxAtendimento)) continue;
 
                     let u = colunas[idxUnidade].replace(/["']/g, '').trim();
@@ -288,14 +259,15 @@
                     let dm = idxDataMalote !== -1 && colunas[idxDataMalote] ? colunas[idxDataMalote].replace(/["']/g, '').trim() : "Não informada";
 
                     if(!u || !a) continue;
-                    if(!unidadeAviso) { unidadeAviso = u; dataAviso = dm; }
-
-                    let unidadeNorm = normalizarUnidade(u);
-                    let id = `${unidadeNorm}-${a}`;
                     
+                    let unidadeNorm = normalizarUnidade(u);
+                    unidadesAviso.add(unidadeNorm);
+
+                    let id = `${unidadeNorm}-${a}`;
                     let dataMaloteBanco = dm;
                     if(dm.includes('/')) { let partes = dm.split('/'); if(partes.length === 3) dataMaloteBanco = `${partes[2]}-${partes[1]}-${partes[0]}`; }
                     
+                    // A magica da unificação acontece aqui. Se Atendimento repete, ele é ignorado. Se não repete, ele soma.
                     if (!setAtendimentos.has(id)) {
                         setAtendimentos.add(id);
                         registrosValidos.push({
@@ -304,16 +276,18 @@
                         });
                     }
                 }
+            }
 
-                // ALERTA VERBOSO RECUPERADO
-                let dataVisual = dataRecebimentoReal.split('-').reverse().join('/');
-                const msg = `✅ CSV Preparado!\n\n📌 Unidade: ${unidadeAviso.toUpperCase()}\n📅 Data do Malote: ${dataAviso}\n📦 Total Lidos: ${registrosValidos.length}\n\n⚠️ Será registrado como recebido em: ${dataVisual}\n\nConfirmar gravação?`;
-                
-                if(!confirm(msg)) { document.getElementById('csvFileInput').value = ''; return; }
+            if(registrosValidos.length === 0) { alert("Nenhum dado válido encontrado."); return; }
 
-                const { error } = await banco.from('malotes').upsert(registrosValidos);
-                if(!error) { fecharModal('checkinModal'); } else { alert('Erro ao gravar no banco.'); }
-            };
+            let dataVisual = dataRecebimentoReal.split('-').reverse().join('/');
+            let uniArray = Array.from(unidadesAviso).join(', ');
+            const msg = `✅ Arquivos Processados!\n\n📌 Unidades Inseridas: ${uniArray}\n📦 Total Lidos e Somados: ${registrosValidos.length}\n\n⚠️ Recebimento: ${dataVisual}\n\nConfirmar gravação?`;
+            
+            if(!confirm(msg)) { fileInput.value = ''; return; }
+
+            const { error } = await banco.from('malotes').upsert(registrosValidos);
+            if(!error) { fecharModal('checkinModal'); } else { alert('Erro ao gravar no banco.'); }
         }
 
         function extrairDiaDaStringData(dataStr) {
@@ -367,9 +341,14 @@
                 if(diaMalote >= diaInicio && diaMalote <= diaFim) {
                     let chave = `${linha.unidade}-${diaMalote}`;
                     if(!malotesAgrupados[chave]) {
-                        malotesAgrupados[chave] = { unidade: linha.unidade, diaMalote: diaMalote, data_malote: linha.data_malote, data_checkin: linha.data_checkin, quantidade: 0 };
+                        malotesAgrupados[chave] = { 
+                            unidade: linha.unidade, diaMalote: diaMalote, data_malote: linha.data_malote, 
+                            data_checkin: linha.data_checkin, quantidade: 0,
+                            usuarios: new Set() // Guarda quem fez o check-in deste bloco
+                        };
                     }
                     malotesAgrupados[chave].quantidade++;
+                    malotesAgrupados[chave].usuarios.add(linha.usuario_checkin);
                 }
             });
 
@@ -387,11 +366,15 @@
                     let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0');
                     let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
 
+                    // TRAVA DE EXCLUSÃO: Só Master ou o dono do Check-in podem excluir
+                    let podeDeletar = usuarioAtual.perfil === 'master' || grupo.usuarios.has(usuarioAtual.login);
+                    let btnDelete = podeDeletar ? `<button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 items-center justify-center text-[10px] font-bold shadow-lg hover:bg-red-800 transition z-20">✕</button>` : '';
+
                     celula.innerHTML = `
                         <div class="w-full h-full ${corFundo} border rounded shadow-md opacity-100 flex flex-col items-center justify-center text-white relative group p-0.5 transition-transform hover:scale-105 z-10" title="Entrega: ${diaEntrega}/${mesEntrega}\nQtd: ${grupo.quantidade}">
                             <span class="text-[9px] leading-tight font-medium opacity-90">${diaEntrega}/${mesEntrega}</span>
                             <span class="text-[12px] font-bold leading-tight drop-shadow-md">${grupo.quantidade}</span>
-                            <button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 items-center justify-center text-[10px] font-bold shadow-lg hover:bg-red-800 transition z-20">✕</button>
+                            ${btnDelete}
                         </div>
                     `;
                 }
@@ -399,12 +382,9 @@
         }
 
         async function carregarDadosSupabase() {
-            const ano = document.getElementById('filtroAno').value;
-            const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value; const mes = document.getElementById('filtroMes').value;
             const ultimoDia = new Date(ano, parseInt(mes), 0).getDate();
-            const dataInicio = `${ano}-${mes}-01`;
-            const dataFim = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
-            
+            const dataInicio = `${ano}-${mes}-01`; const dataFim = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
             const { data, error } = await banco.from('malotes').select('*').gte('data_malote', dataInicio).lte('data_malote', dataFim);
             if(!error && data) { dadosLocais = data; construirMatriz(); }
         }
@@ -419,21 +399,15 @@
         }).subscribe();
 
         function definirFiltrosAtuais() {
-            const hoje = new Date();
-            const ano = hoje.getFullYear().toString();
-            const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-            const dia = hoje.getDate();
-            const parte = dia > 15 ? "2" : "1";
-            document.getElementById('filtroAno').value = ano;
-            document.getElementById('filtroMes').value = mes;
-            document.getElementById('filtroParte').value = parte;
+            const hoje = new Date(); const ano = hoje.getFullYear().toString(); const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+            const dia = hoje.getDate(); const parte = dia > 15 ? "2" : "1";
+            document.getElementById('filtroAno').value = ano; document.getElementById('filtroMes').value = mes; document.getElementById('filtroParte').value = parte;
         }
 
         async function iniciarDashboard() {
             definirFiltrosAtuais(); construirMatriz(); 
             const { data } = await banco.from('configuracoes').select('data_mestre').eq('id', 1).single();
-            if(data) dataMestreGlobal = data.data_mestre;
-            document.getElementById('dataConfig').value = dataMestreGlobal;
+            if(data) dataMestreGlobal = data.data_mestre; document.getElementById('dataConfig').value = dataMestreGlobal;
             await carregarDadosSupabase();
         }
 
