@@ -174,10 +174,25 @@
         }
 
         async function carregarDados() {
-            const { data } = await banco.from('malotes').select('*').in('status', ['RECEBIDO', 'PROCESSANDO', 'AUSENTE']);
-            if (data) {
-                dadosGerais = data.filter(d => d.status !== 'AUSENTE');
-                listaGlobalAusentes = data.filter(d => d.status === 'AUSENTE');
+            let todosDados = [];
+            let from = 0;
+            const step = 1000;
+
+            // Busca todas as demandas em loop infinito para não cortar nada
+            while (true) {
+                const { data, error } = await banco.from('malotes')
+                                                   .select('*')
+                                                   .in('status', ['RECEBIDO', 'PROCESSANDO', 'AUSENTE'])
+                                                   .range(from, from + step - 1);
+                if (error) break;
+                if (data && data.length > 0) todosDados.push(...data);
+                if (!data || data.length < step) break;
+                from += step;
+            }
+
+            if (todosDados.length >= 0) {
+                dadosGerais = todosDados.filter(d => d.status !== 'AUSENTE');
+                listaGlobalAusentes = todosDados.filter(d => d.status === 'AUSENTE');
                 processarAgrupamentos(); renderizarQuadros(); renderizarOndasProcessamento(); atualizarGraficos();
             }
         }
@@ -337,11 +352,28 @@
 
         async function baixarRelatorio() {
             const dataFiltro = new Date(); dataFiltro.setDate(dataFiltro.getDate() - 30);
-            const { data } = await banco.from('malotes').select('*').gte('data_malote', dataFiltro.toISOString().split('T')[0]);
-            if(!data || data.length === 0) return alert("Sem dados.");
+            const strFiltro = dataFiltro.toISOString().split('T')[0];
+            
+            let todosDados = [];
+            let from = 0;
+            const step = 1000;
+            
+            // Loop de paginação infinita para o relatório
+            while (true) {
+                const { data, error } = await banco.from('malotes')
+                                                   .select('*')
+                                                   .gte('data_malote', strFiltro)
+                                                   .range(from, from + step - 1);
+                if (error) break;
+                if (data && data.length > 0) todosDados.push(...data);
+                if (!data || data.length < step) break;
+                from += step;
+            }
+
+            if(todosDados.length === 0) return alert("Sem dados.");
             
             let csvContent = "data:text/csv;charset=utf-8,ID;Unidade;Atendimento;Data Malote;Status;Resp Checkin;Data Inicio;Resp Inicio;Resp Finalizacao\n";
-            data.forEach(r => { csvContent += `${r.id_unico};${r.unidade};${r.atendimento};${r.data_malote};${r.status};${r.usuario_checkin||'-'};${r.data_inicio||'-'};${r.usuario_inicio||'-'};${r.usuario_finalizacao||'-'}\n`; });
+            todosDados.forEach(r => { csvContent += `${r.id_unico};${r.unidade};${r.atendimento};${r.data_malote};${r.status};${r.usuario_checkin||'-'};${r.data_inicio||'-'};${r.usuario_inicio||'-'};${r.usuario_finalizacao||'-'}\n`; });
             
             const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Relatorio_Operacao_${new Date().toISOString().split('T')[0]}.csv`);
             document.body.appendChild(link); link.click(); document.body.removeChild(link);
