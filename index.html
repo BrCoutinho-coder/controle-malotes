@@ -235,13 +235,14 @@
                 const linhas = text.split(/\r?\n/);
                 if (linhas.length < 2) continue;
 
-                let idxUnidade = -1; let idxAtendimento = -1; let idxDataMalote = -1; let linhaDadosInicio = 1;
+                let idxUnidade = -1; let idxAtendimento = -1; let idxDataMalote = -1; let idxGuia = -1; let linhaDadosInicio = 1;
                 for(let j = 0; j < Math.min(5, linhas.length); j++) {
                     let colunas = linhas[j].split(';'); 
                     for(let c = 0; c < colunas.length; c++) {
                         let celulaLimpa = colunas[c].toLowerCase().replace(/[^a-z0-9]/g, '');
                         if(celulaLimpa === 'unidade') idxUnidade = c;
                         if(celulaLimpa === 'atendimento') idxAtendimento = c;
+                        if(celulaLimpa === 'guia') idxGuia = c; // Captura a guia para evitar esmagamento
                         if(celulaLimpa === 'dataatendimento' || celulaLimpa === 'data') idxDataMalote = c;
                     }
                     if(idxUnidade !== -1 && idxAtendimento !== -1) { linhaDadosInicio = j + 1; break; }
@@ -256,6 +257,7 @@
 
                     let u = colunas[idxUnidade].replace(/["']/g, '').trim();
                     let a = colunas[idxAtendimento].replace(/["']/g, '').trim();
+                    let g = idxGuia !== -1 ? colunas[idxGuia].replace(/["']/g, '').trim() : "0";
                     let dm = idxDataMalote !== -1 && colunas[idxDataMalote] ? colunas[idxDataMalote].replace(/["']/g, '').trim() : "Não informada";
 
                     if(!u || !a) continue;
@@ -263,11 +265,11 @@
                     let unidadeNorm = normalizarUnidade(u);
                     unidadesAviso.add(unidadeNorm);
 
-                    let id = `${unidadeNorm}-${a}`;
+                    // ID BLINDADO: Unidade + Atendimento + Guia (Impossível duplicar errado agora)
+                    let id = `${unidadeNorm}-${a}-${g}`;
                     let dataMaloteBanco = dm;
                     if(dm.includes('/')) { let partes = dm.split('/'); if(partes.length === 3) dataMaloteBanco = `${partes[2]}-${partes[1]}-${partes[0]}`; }
                     
-                    // A magica da unificação acontece aqui. Se Atendimento repete, ele é ignorado. Se não repete, ele soma.
                     if (!setAtendimentos.has(id)) {
                         setAtendimentos.add(id);
                         registrosValidos.push({
@@ -382,21 +384,33 @@
         }
 
         async function carregarDadosSupabase() {
-            const ano = document.getElementById('filtroAno').value; const mes = document.getElementById('filtroMes').value;
+            const ano = document.getElementById('filtroAno').value;
+            const mes = document.getElementById('filtroMes').value;
             const ultimoDia = new Date(ano, parseInt(mes), 0).getDate();
-            const dataInicio = `${ano}-${mes}-01`; const dataFim = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
-            const { data, error } = await banco.from('malotes').select('*').gte('data_malote', dataInicio).lte('data_malote', dataFim);
-            if(!error && data) { dadosLocais = data; construirMatriz(); }
-        }
+            const dataInicio = `${ano}-${mes}-01`;
+            const dataFim = `${ano}-${mes}-${String(ultimoDia).padStart(2, '0')}`;
+            
+            let todosDados = [];
+            let from = 0;
+            const step = 1000;
 
-        let debounceTimer;
-        banco.channel('canal-malotes').on('postgres_changes', { event: '*', schema: 'public', table: 'malotes' }, payload => {
-            clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { carregarDadosSupabase(); }, 500);
-        }).subscribe();
-        
-        banco.channel('canal-config').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracoes' }, payload => {
-            dataMestreGlobal = payload.new.data_mestre; document.getElementById('dataConfig').value = dataMestreGlobal; construirMatriz(); 
-        }).subscribe();
+            // Loop de paginação infinita para burlar o limite do Supabase
+            while (true) {
+                const { data, error } = await banco.from('malotes')
+                                                   .select('*')
+                                                   .gte('data_malote', dataInicio)
+                                                   .lte('data_malote', dataFim)
+                                                   .range(from, from + step - 1);
+                
+                if (error) break;
+                if (data && data.length > 0) todosDados.push(...data);
+                if (!data || data.length < step) break; // Acabou os dados
+                from += step;
+            }
+
+            dadosLocais = todosDados; 
+            construirMatriz(); 
+        }
 
         function definirFiltrosAtuais() {
             const hoje = new Date(); const ano = hoje.getFullYear().toString(); const mes = String(hoje.getMonth() + 1).padStart(2, '0');
