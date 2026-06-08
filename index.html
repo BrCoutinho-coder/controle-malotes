@@ -13,7 +13,6 @@
         .cursor-pointer { cursor: pointer; }
         .custom-scroll::-webkit-scrollbar { width: 6px; }
         .custom-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-        /* Padrão visual para unidades fechadas de domingo */
         .bg-fechado { background: repeating-linear-gradient(45deg, #f1f5f9, #f1f5f9 5px, #e2e8f0 5px, #e2e8f0 10px); opacity: 0.8; }
     </style>
 </head>
@@ -42,7 +41,6 @@
 
     <div id="configModal" class="hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded shadow-xl w-[500px] flex flex-col gap-5 max-h-[90vh] overflow-y-auto custom-scroll">
-            
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <h2 class="text-sm font-bold text-slate-800 mb-1 border-b pb-1">Data Mestre</h2>
@@ -53,15 +51,11 @@
                     <input type="number" id="metaDemandaConfig" placeholder="Ex: 400" class="w-full border border-slate-300 p-2 text-sm rounded text-slate-700 font-bold">
                 </div>
             </div>
-
             <div>
                 <h2 class="text-sm font-bold text-slate-800 mb-2 border-b pb-1">Unidades ABERTAS aos Domingos</h2>
-                <div id="listaDomingos" class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded bg-slate-50 custom-scroll text-sm">
-                    </div>
+                <div id="listaDomingos" class="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto border p-2 rounded bg-slate-50 custom-scroll text-sm"></div>
             </div>
-
             <button onclick="salvarConfig()" class="w-full py-2 bg-[#1e3a8a] hover:bg-blue-800 text-white rounded font-bold shadow">💾 Salvar Configurações Globais</button>
-
             <div class="mt-2 border-t pt-4">
                 <h2 class="text-sm font-bold text-slate-800 mb-2 border-b pb-1">Gerenciar Equipe</h2>
                 <div id="listaUsuarios" class="flex flex-col gap-2 mb-2 max-h-24 overflow-y-auto border p-2 rounded bg-slate-50 custom-scroll"></div>
@@ -71,21 +65,29 @@
                     <button onclick="criarUsuario()" class="px-4 bg-green-600 text-white rounded font-bold text-sm">Criar</button>
                 </div>
             </div>
-
             <div class="flex justify-end pt-2">
                 <button onclick="fecharModal('configModal')" class="px-6 py-2 bg-slate-200 text-slate-700 rounded font-bold hover:bg-slate-300">Fechar</button>
             </div>
         </div>
     </div>
 
+    <!-- Modal de Check-in com Atalho Master -->
     <div id="checkinModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white p-6 rounded shadow-xl w-[450px] border-t-4 border-blue-600">
             <h2 class="text-lg font-bold text-slate-800 mb-4">Check-in de Malote</h2>
             <label class="block text-sm font-medium text-slate-600 mb-1">Data REAL do Recebimento:</label>
             <input type="date" id="dataRecebimento" class="w-full border border-slate-300 p-2 rounded mb-4 text-slate-700">
+            
             <label class="block text-sm font-medium text-slate-600 mb-1">Arquivos CSV (Pode selecionar vários):</label>
-            <input type="file" id="csvFileInput" accept=".csv" multiple class="w-full border border-slate-300 p-2 rounded mb-6 text-slate-700 cursor-pointer">
-            <div class="flex justify-end gap-2">
+            <input type="file" id="csvFileInput" accept=".csv" multiple class="w-full border border-slate-300 p-2 rounded mb-4 text-slate-700 cursor-pointer">
+            
+            <!-- CAIXINHA DE FAST-TRACK (SÓ MASTER) -->
+            <label id="lblCheckinFinalizado" class="hidden flex items-center gap-2 mb-6 cursor-pointer text-sm font-bold text-green-700 bg-green-50 p-2 rounded border border-green-200">
+                <input type="checkbox" id="chkLancarFinalizado" class="w-4 h-4 text-green-600 rounded">
+                Lançar como JÁ FINALIZADO (Histórico antigo)
+            </label>
+
+            <div class="flex justify-end gap-2 mt-2">
                 <button onclick="fecharModal('checkinModal')" class="px-4 py-2 bg-slate-200 text-slate-700 rounded font-medium">Cancelar</button>
                 <button onclick="processarCheckin()" class="px-4 py-2 bg-blue-600 text-white rounded font-bold">Validar CSV(s)</button>
             </div>
@@ -134,7 +136,12 @@
             if (!usuarioAtual) { document.getElementById('loginModal').classList.remove('hidden'); } 
             else {
                 document.getElementById('loginModal').classList.add('hidden');
-                if (usuarioAtual.perfil === 'master') { document.getElementById('btnConfig').classList.remove('hidden'); }
+                if (usuarioAtual.perfil === 'master') { 
+                    document.getElementById('btnConfig').classList.remove('hidden'); 
+                    document.getElementById('lblCheckinFinalizado').classList.remove('hidden');
+                } else {
+                    document.getElementById('lblCheckinFinalizado').classList.add('hidden');
+                }
                 iniciarDashboard();
             }
         }
@@ -160,14 +167,7 @@
             document.getElementById('configModal').classList.remove('hidden'); 
             document.getElementById('dataConfig').value = configGlobal.data_mestre;
             document.getElementById('metaDemandaConfig').value = configGlobal.meta_demanda;
-            
-            document.getElementById('listaDomingos').innerHTML = unidadesFinais.map(u => `
-                <label class="flex items-center gap-2 p-1 border rounded bg-white hover:bg-blue-50 cursor-pointer transition">
-                    <input type="checkbox" value="${u}" class="chk-domingo w-4 h-4 text-blue-600 rounded" ${configGlobal.unidades_domingo.includes(u) ? 'checked' : ''}>
-                    <span class="text-[11px] font-bold text-slate-700">${u}</span>
-                </label>
-            `).join('');
-
+            document.getElementById('listaDomingos').innerHTML = unidadesFinais.map(u => `<label class="flex items-center gap-2 p-1 border rounded bg-white hover:bg-blue-50 cursor-pointer transition"><input type="checkbox" value="${u}" class="chk-domingo w-4 h-4 text-blue-600 rounded" ${configGlobal.unidades_domingo.includes(u) ? 'checked' : ''}><span class="text-[11px] font-bold text-slate-700">${u}</span></label>`).join('');
             carregarUsuariosEquipe(); 
         }
 
@@ -175,7 +175,6 @@
             let meta = parseInt(document.getElementById('metaDemandaConfig').value) || 400;
             let dataM = document.getElementById('dataConfig').value;
             let undDom = Array.from(document.querySelectorAll('.chk-domingo:checked')).map(c => c.value);
-            
             await banco.from('configuracoes').update({ data_mestre: dataM, meta_demanda: meta, unidades_domingo: undDom }).eq('id', 1);
             fecharModal('configModal');
         }
@@ -199,7 +198,9 @@
 
         function abrirModalCheckin() {
             document.getElementById('dataRecebimento').value = new Date().toISOString().split('T')[0];
-            document.getElementById('csvFileInput').value = ""; document.getElementById('checkinModal').classList.remove('hidden');
+            document.getElementById('csvFileInput').value = ""; 
+            if(document.getElementById('chkLancarFinalizado')) document.getElementById('chkLancarFinalizado').checked = false;
+            document.getElementById('checkinModal').classList.remove('hidden');
         }
 
         function destacarLinha(elementoClicado) { document.querySelectorAll('tr').forEach(tr => tr.classList.remove('linha-destacada')); elementoClicado.classList.add('linha-destacada'); }
@@ -217,12 +218,8 @@
             for (let d = diaInicio; d <= diaFim; d++) {
                 let dataAux = new Date(ano, parseInt(mes) - 1, d);
                 let diaStr = diasSemana[dataAux.getDay()];
-                let corDia = dataAux.getDay() === 0 ? 'text-red-500' : 'text-slate-400'; // Destaca domingo de vermelho
-                
-                thHTML += `<th class="px-1 py-2 border-r border-slate-200 w-16 text-center leading-tight">
-                            <div class="text-[10px] ${corDia} font-black">${diaStr}</div>
-                            <div class="text-sm">${d.toString().padStart(2, '0')}</div>
-                           </th>`;
+                let corDia = dataAux.getDay() === 0 ? 'text-red-500' : 'text-slate-400';
+                thHTML += `<th class="px-1 py-2 border-r border-slate-200 w-16 text-center leading-tight"><div class="text-[10px] ${corDia} font-black">${diaStr}</div><div class="text-sm">${d.toString().padStart(2, '0')}</div></th>`;
             }
             thHTML += `</tr>`; thead.innerHTML = thHTML;
 
@@ -239,7 +236,6 @@
 
         function normalizarUnidade(nome) { return mapaUnidades[nome.trim().toUpperCase()] || nome.trim().toUpperCase(); }
 
-        // AJUSTE DOS PRAZOS: Matemática de 4 dias somados para fechar o 5º dia.
         function calcularPrazo(dataInicialStr) {
             let strLimpa = dataInicialStr.includes('T') ? dataInicialStr.split('T')[0] : dataInicialStr;
             let data = new Date(strLimpa + "T12:00:00"); let diasAdicionados = 0;
@@ -256,6 +252,11 @@
 
             if(files.length === 0) { alert("Anexe pelo menos um arquivo CSV."); return; }
             if(!dataRecebimentoReal) { alert("Escolha a data do recebimento."); return; }
+
+            // Lógica do Fast-Track do Master
+            let isFinalizado = document.getElementById('chkLancarFinalizado') && document.getElementById('chkLancarFinalizado').checked;
+            let statusDefinido = isFinalizado ? 'FINALIZADO' : 'RECEBIDO';
+            let usuarioFim = isFinalizado ? usuarioAtual.login : null;
 
             let registrosValidos = []; let setAtendimentos = new Set(); let unidadesAviso = new Set();
             let dataRetroativaIso = new Date(dataRecebimentoReal + "T12:00:00").toISOString();
@@ -291,14 +292,19 @@
                     
                     if (!setAtendimentos.has(id)) {
                         setAtendimentos.add(id);
-                        registrosValidos.push({ id_unico: id, unidade: unidadeNorm, atendimento: a, data_malote: dataMaloteBanco, data_checkin: dataRetroativaIso, status: "RECEBIDO", usuario_checkin: usuarioAtual.login });
+                        registrosValidos.push({ 
+                            id_unico: id, unidade: unidadeNorm, atendimento: a, data_malote: dataMaloteBanco, 
+                            data_checkin: dataRetroativaIso, status: statusDefinido, 
+                            usuario_checkin: usuarioAtual.login, usuario_finalizacao: usuarioFim
+                        });
                     }
                 }
             }
 
             if(registrosValidos.length === 0) { alert("Nenhum dado válido."); return; }
             let uniArray = Array.from(unidadesAviso).join(', ');
-            if(!confirm(`✅ Processados!\n\n📌 Unidades: ${uniArray}\n📦 Total: ${registrosValidos.length}\n\nConfirmar gravação?`)) { fileInput.value = ''; return; }
+            let textoConfirmacao = isFinalizado ? `⚠️ ATENÇÃO: Estes malotes irão DIRETO PARA O HISTÓRICO.\n` : '';
+            if(!confirm(`${textoConfirmacao}✅ Processados!\n\n📌 Unidades: ${uniArray}\n📦 Total: ${registrosValidos.length}\n\nConfirmar gravação?`)) { fileInput.value = ''; return; }
 
             const { error } = await banco.from('malotes').upsert(registrosValidos);
             if(!error) { fecharModal('checkinModal'); carregarDadosSupabase(); } else { alert('Erro ao gravar no banco.'); }
@@ -315,6 +321,17 @@
             if(confirm(`CANCELAR check-in de:\nUnidade: ${unidade}\nData Malote: ${dataMalote}?`)) {
                 await banco.from('malotes').delete().eq('unidade', unidade).eq('data_malote', dataMalote);
                 carregarDadosSupabase();
+            }
+        }
+
+        // FUNÇÃO NOVA: Força a Finalização via Matriz
+        async function forcarFinalizacao(unidade, dataMalote) {
+            if(confirm(`ATENÇÃO: Deseja forçar a FINALIZAÇÃO imediata deste malote?\n\nUnidade: ${unidade}\nData Lote: ${dataMalote}`)) {
+                const { error } = await banco.from('malotes').update({ 
+                    status: 'FINALIZADO', usuario_finalizacao: usuarioAtual.login 
+                }).eq('unidade', unidade).eq('data_malote', dataMalote).neq('status', 'FINALIZADO');
+                
+                if(!error) { carregarDadosSupabase(); } else { alert('Erro ao forçar finalização.'); }
             }
         }
 
@@ -335,7 +352,6 @@
                     let abreDomingo = configGlobal.unidades_domingo.includes(unidade);
 
                     if (isDomingo && !abreDomingo) {
-                        // BLOQUEIO VISUAL: Unidade fechada neste domingo
                         celula.innerHTML = `<div class="w-full h-full bg-fechado rounded border border-slate-200" title="Fechado aos Domingos"></div>`;
                         continue; 
                     }
@@ -353,8 +369,16 @@
                 let diaMalote = extrairDiaDaStringData(linha.data_malote);
                 if(diaMalote >= diaInicio && diaMalote <= diaFim) {
                     let chave = `${linha.unidade}-${diaMalote}`;
-                    if(!malotesAgrupados[chave]) { malotesAgrupados[chave] = { unidade: linha.unidade, diaMalote: diaMalote, data_malote: linha.data_malote, data_checkin: linha.data_checkin, quantidade: 0, usuarios: new Set() }; }
-                    malotesAgrupados[chave].quantidade++; malotesAgrupados[chave].usuarios.add(linha.usuario_checkin);
+                    if(!malotesAgrupados[chave]) { 
+                        malotesAgrupados[chave] = { 
+                            unidade: linha.unidade, diaMalote: diaMalote, data_malote: linha.data_malote, 
+                            data_checkin: linha.data_checkin, quantidade: 0, usuarios: new Set(),
+                            statusArray: [] // Array para analisar se está tudo finalizado
+                        }; 
+                    }
+                    malotesAgrupados[chave].quantidade++; 
+                    malotesAgrupados[chave].usuarios.add(linha.usuario_checkin);
+                    malotesAgrupados[chave].statusArray.push(linha.status);
                 }
             });
 
@@ -369,14 +393,25 @@
 
                     let corFundo = (dataCheckin <= prazoDesteMalote) ? 'bg-green-500 border-green-600' : 'bg-yellow-400 border-yellow-500';
                     let diaEntrega = dataCheckin.getDate().toString().padStart(2, '0'); let mesEntrega = (dataCheckin.getMonth() + 1).toString().padStart(2, '0');
+                    
                     let podeDeletar = usuarioAtual.perfil === 'master' || grupo.usuarios.has(usuarioAtual.login);
-                    let btnDelete = podeDeletar ? `<button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 items-center justify-center text-[10px] font-bold shadow-lg hover:bg-red-800 transition z-20">✕</button>` : '';
+                    let isTotalmenteFinalizado = grupo.statusArray.every(s => s === 'FINALIZADO' || s === 'AUSENTE');
+
+                    let btnDelete = podeDeletar ? `<button onclick="deletarCheckin('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full w-5 h-5 items-center justify-center text-[10px] font-bold shadow-lg hover:bg-red-800 transition z-20" title="Excluir (Desfazer Check-in)">✕</button>` : '';
+                    
+                    // BOTÃO NOVO (SÓ MASTER)
+                    let btnForcarFim = (usuarioAtual.perfil === 'master' && !isTotalmenteFinalizado) ? `<button onclick="forcarFinalizacao('${grupo.unidade}', '${grupo.data_malote}')" class="hidden group-hover:flex absolute -top-1.5 -left-1.5 bg-green-500 text-white rounded-full w-5 h-5 items-center justify-center text-[10px] font-bold shadow-lg hover:bg-green-700 transition z-20" title="Forçar Finalização Deste Malote">✔</button>` : '';
+                    
+                    // SELO DE CONCLUSÃO VISUAL
+                    let seloConcluido = isTotalmenteFinalizado ? `<div class="absolute -bottom-1.5 -right-1.5 bg-green-700 rounded-full w-4 h-4 flex items-center justify-center text-[10px] border-2 border-white shadow-sm z-10" title="Malote Totalmente Finalizado">✔</div>` : '';
 
                     celula.innerHTML = `
                         <div class="w-full h-full ${corFundo} border rounded shadow-md opacity-100 flex flex-col items-center justify-center text-white relative group p-0.5 transition-transform hover:scale-105 z-10" title="Entrega: ${diaEntrega}/${mesEntrega}\nQtd: ${grupo.quantidade}">
                             <span class="text-[9px] leading-tight font-medium opacity-90">${diaEntrega}/${mesEntrega}</span>
                             <span class="text-[12px] font-bold leading-tight drop-shadow-md">${grupo.quantidade}</span>
+                            ${btnForcarFim}
                             ${btnDelete}
+                            ${seloConcluido}
                         </div>
                     `;
                 }
